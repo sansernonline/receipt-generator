@@ -1,7 +1,5 @@
+import { ChatShell } from "@/features/chat/chat-shell";
+
 export default function HomePage() {
-  return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold text-brand">Bill Gen</h1>
-    </main>
-  );
+  return <ChatShell />;
 }

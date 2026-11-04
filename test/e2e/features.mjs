@@ -4,6 +4,7 @@ export const features = {
     { name: "GET / returns 200", path: "/", status: 200 },
     { name: "page declares Thai language", path: "/", includes: ['lang="th"'] },
     { name: "title is Bill Gen", path: "/", includes: ["<title>Bill Gen</title>"] },
-    { name: "heading h1 says Bill Gen", path: "/", includes: [">Bill Gen</h1>"] },
+    { name: "home is the chat page", path: "/", includes: ['aria-label="รายการแชต"', 'aria-label="ข้อความ"'] },
+    { name: "/edit is not found", path: "/edit", status: 404, includes: ["ไม่พบหน้า"] },
   ],
 };
