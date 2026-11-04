@@ -101,7 +101,8 @@ export function ChatShell() {
       setMessages((current) => [...current, message]);
       setText((current) => (current === sentText ? "" : current)); // keep what was typed while sending
     } catch {
-      setHasSendError(true); // the text stays in the box so nothing typed is lost
+      setText((current) => current || sentText); // creating the chat cleared the box; give the text back
+      setHasSendError(true);
     } finally {
       setIsBusy(false);
     }

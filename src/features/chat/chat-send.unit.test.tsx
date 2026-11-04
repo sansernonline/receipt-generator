@@ -94,3 +94,13 @@ test("text typed while a message is still sending stays in the box", async () =>
   await screen.findByText("แรก", { selector: "p" });
   expect(screen.getByRole("textbox", { name: "ข้อความ" })).toHaveValue("พิมพ์ต่อ");
 });
+
+test("when the chat is created but the message fails, the typed text comes back in the box", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => (url.endsWith("/messages") ? new Response("{}", { status: 500 }) : init?.method === "POST" ? Response.json({ chat: created }, { status: 201 }) : Response.json({ chats: [] }))));
+  render(<ChatShell />);
+
+  await sendText("ข้อความแรกที่พิมพ์");
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("ส่งข้อความไม่สำเร็จ");
+  expect(screen.getByRole("textbox", { name: "ข้อความ" })).toHaveValue("ข้อความแรกที่พิมพ์");
+});
