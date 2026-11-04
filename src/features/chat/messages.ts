@@ -6,7 +6,7 @@ export const MAX_MESSAGE_CHARS = 10_000; // visible characters; size guard for i
 
 type StoredChat = { id: string; title: string; updatedAt: string; shopId: string | null; billNumber: string | null; customerName: string | null; messages: { role: string; text: string; createdAt: string }[] };
 
-// simple: read-modify-write without a lock — one server process, one message in flight per chat in the UI
+// read-modify-write runs inside the per-chat lock, so messages sent at the same time are all kept
 export function addUserMessage(store: Store, chatId: string, text: string, now: Date = new Date()) {
   return store.withChatLock(chatId, async () => {
     const file = path.join(store.chatDir(chatId), "chat.json");
