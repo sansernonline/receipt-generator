@@ -140,3 +140,21 @@ test("[NFR-COMP-020] on a small screen the menu button opens the chat list drawe
   fireEvent.click(within(drawer).getByRole("button", { name: "แชตเมื่อวาน" }));
   await waitFor(() => expect(drawer).toHaveAttribute("data-open", "false"));
 });
+
+test("[NFR-COMP-020] the drawer moves focus to its new chat button when it opens and back to the menu button when it closes", async () => {
+  stubServer(FOUR, (id) => Response.json(detail(id, "แชตเมื่อวาน", ["x"])));
+  render(<ChatShell />);
+  await within(listNav()).findByText("วันนี้ (2)");
+  const drawer = screen.getByRole("complementary", { name: "ประวัติแชต" });
+  const menu = screen.getByRole("button", { name: "เปิดประวัติแชต" });
+
+  fireEvent.click(menu);
+  expect(within(drawer).getAllByRole("button", { name: "แชตใหม่" })[0]).toHaveFocus();
+
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(menu).toHaveFocus();
+
+  fireEvent.click(menu);
+  fireEvent.click(screen.getByRole("button", { name: "ปิดประวัติแชต" }));
+  expect(menu).toHaveFocus();
+});

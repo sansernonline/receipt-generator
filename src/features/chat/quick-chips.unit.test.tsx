@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { createRef } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import { ChatPane } from "./chat-pane";
 import { ChatShell } from "./chat-shell";
@@ -13,7 +14,7 @@ const STAGES: ChatStage[] = ["no-shop", "no-items", "has-items"];
 const FIRST_STAGE_CHIP = "ส่งรูปบิลตัวอย่าง";
 
 function renderPane(stage: ChatStage, onFillText = vi.fn()) {
-  render(<ChatPane title="แชตใหม่" messages={[]} text="" stage={stage} isBusy={false} hasSendError={false} openError={null} onOpenDrawer={() => undefined} onTextChange={() => undefined} onFillText={onFillText} onSend={() => undefined} />);
+  render(<ChatPane title="แชตใหม่" messages={[]} text="" stage={stage} isBusy={false} hasSendError={false} openError={null} menuRef={createRef()} onOpenDrawer={() => undefined} onTextChange={() => undefined} onFillText={onFillText} onSend={() => undefined} />);
   return within(screen.getByRole("group", { name: "คำสั่งด่วน" }));
 }
 const chipLabels = (stage: ChatStage) => {
@@ -112,4 +113,11 @@ test("clicking พิมพ์ข้อมูลร้าน puts the example te
 
   expect(screen.getByRole("textbox", { name: "ข้อความ" })).toHaveValue("ร้านกาแฟบ้านสวน 12/3 ถ.สุขุมวิท ชลบุรี โทร 038-123456 ออกบิลเงินสด");
   expect(screen.getByRole("button", { name: "ส่ง" })).toBeEnabled();
+});
+
+test("a disabled chip says it is coming soon; an enabled chip has no such tooltip", () => {
+  const chips = renderPane("no-items");
+
+  expect(chips.getByRole("button", { name: "ส่งรูปรายการ" })).toHaveAttribute("title", "เร็วๆ นี้");
+  expect(chips.getByRole("button", { name: "พิมพ์รายการตัวอย่าง" })).not.toHaveAttribute("title");
 });

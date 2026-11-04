@@ -17,6 +17,9 @@ export function ChatShell() {
   const [hasSendError, setHasSendError] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const newChatRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  const wasDrawerOpen = useRef(false);
   const latestOpen = useRef(0); // only the last chat the user clicked may fill the screen
   const [isBusy, setIsBusy] = useState(true); // true while loading the list, so a late list cannot overwrite a new chat
 
@@ -27,6 +30,13 @@ export function ChatShell() {
       .catch(() => setHasListError(true)) // the user can still start a chat
       .finally(() => setIsBusy(false));
   }, []);
+
+  // keyboard users: focus goes into the drawer when it opens and back to the menu button when it closes
+  useEffect(() => {
+    if (isDrawerOpen) newChatRef.current?.focus();
+    else if (wasDrawerOpen.current) menuRef.current?.focus();
+    wasDrawerOpen.current = isDrawerOpen;
+  }, [isDrawerOpen]);
 
   useEffect(() => {
     if (!isDrawerOpen) return;
@@ -113,8 +123,8 @@ export function ChatShell() {
   return (
     <div className="h-screen bg-desk p-0 lg:p-2.5">
       <div className="relative grid h-full overflow-hidden bg-white lg:grid-cols-[288px_minmax(440px,1.1fr)_minmax(360px,560px)] lg:rounded-2xl lg:border lg:border-line lg:shadow-sm">
-        <ChatList chats={chats} activeId={activeId} now={new Date()} isBusy={isBusy} isDrawerOpen={isDrawerOpen} hasListError={hasListError} hasCreateError={hasCreateError} onNewChat={startNewChat} onOpen={openChat} />
-        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} hasSendError={hasSendError} openError={openError} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={sendMessage} />
+        <ChatList chats={chats} activeId={activeId} now={new Date()} isBusy={isBusy} isDrawerOpen={isDrawerOpen} hasListError={hasListError} hasCreateError={hasCreateError} newChatRef={newChatRef} onNewChat={startNewChat} onOpen={openChat} />
+        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} hasSendError={hasSendError} openError={openError} menuRef={menuRef} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={sendMessage} />
         {isDrawerOpen && <button type="button" aria-label="ปิดประวัติแชต" onClick={() => setIsDrawerOpen(false)} className="absolute inset-0 z-40 bg-black/40 lg:hidden" />}
         <section aria-label="ตัวอย่างบิล" className="hidden items-center justify-center border-l border-line bg-desk text-sm text-ink-3 lg:flex">
           ตัวอย่างบิลจะแสดงที่นี่

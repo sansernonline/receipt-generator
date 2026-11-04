@@ -104,3 +104,26 @@ test("when the chat is created but the message fails, the typed text comes back 
   expect(await screen.findByRole("alert")).toHaveTextContent("ส่งข้อความไม่สำเร็จ");
   expect(screen.getByRole("textbox", { name: "ข้อความ" })).toHaveValue("ข้อความแรกที่พิมพ์");
 });
+
+test("Enter sends the message, like the send button", async () => {
+  render(<ChatShell />);
+  await screen.findByText("ยังไม่มีแชต");
+  const box = screen.getByRole("textbox", { name: "ข้อความ" });
+  fireEvent.change(box, { target: { value: "สวัสดี" } });
+
+  fireEvent.keyDown(box, { key: "Enter" });
+
+  await waitFor(() => expect(calls).toContain(`POST /api/chats/${created.id}/messages`));
+});
+
+test("Shift+Enter and Enter while composing Thai text do not send", async () => {
+  render(<ChatShell />);
+  await screen.findByText("ยังไม่มีแชต");
+  const box = screen.getByRole("textbox", { name: "ข้อความ" });
+  fireEvent.change(box, { target: { value: "สวัสดี" } });
+
+  fireEvent.keyDown(box, { key: "Enter", shiftKey: true });
+  fireEvent.keyDown(box, { key: "Enter", isComposing: true });
+
+  expect(calls).toEqual(["GET /api/chats"]);
+});

@@ -1,3 +1,4 @@
+import type { RefObject } from "react";
 import { groupChatsByDay, type ChatListItem } from "./group-chats";
 
 type Props = {
@@ -8,11 +9,12 @@ type Props = {
   isDrawerOpen: boolean;
   hasListError: boolean;
   hasCreateError: boolean;
+  newChatRef: RefObject<HTMLButtonElement | null>;
   onNewChat: () => void;
   onOpen: (id: string) => void;
 };
 
-export function ChatList({ chats, activeId, now, isBusy, isDrawerOpen, hasListError, hasCreateError, onNewChat, onOpen }: Props) {
+export function ChatList({ chats, activeId, now, isBusy, isDrawerOpen, hasListError, hasCreateError, newChatRef, onNewChat, onOpen }: Props) {
   return (
     // below lg the list is a drawer that slides over the chat; invisible while closed so it cannot take focus
     <aside
@@ -22,6 +24,7 @@ export function ChatList({ chats, activeId, now, isBusy, isDrawerOpen, hasListEr
     >
       <div className="p-4 font-head text-base font-semibold tracking-wider">BILLGEN</div>
       <button
+        ref={newChatRef}
         type="button"
         onClick={onNewChat}
         disabled={isBusy}
