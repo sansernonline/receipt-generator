@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #1f3fa6;
+  --font-sans: "IBM Plex Sans Thai", system-ui, sans-serif;
+}

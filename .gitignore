@@ -1,0 +1,11 @@
+.next/
+node_modules/
+.env*
+!.env.example
+_to_delete/
+/saved/
+/templates/
+/playwright-report/
+/test-results/
+*.tsbuildinfo
+next-env.d.ts
