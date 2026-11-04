@@ -1,10 +1,10 @@
 const QUICK_COMMANDS = ["ลดท้ายบิล 10%", "VAT ไม่มี", "VAT รวมในราคา", "VAT แยกนอก"];
 
-export function ChatPane() {
+export function ChatPane({ title }: { title: string }) {
   return (
     <main className="flex min-h-0 flex-col bg-white">
       <header className="flex h-[52px] items-center px-4">
-        <h1 className="font-head text-lg font-semibold">แชตใหม่</h1>
+        <h1 className="font-head text-lg font-semibold">{title}</h1>
       </header>
       <section aria-label="บทสนทนา" className="flex-1 overflow-auto p-4 text-sm text-ink-3">
         พิมพ์ข้อมูลร้านและรายการสินค้าเพื่อเริ่มออกบิล
