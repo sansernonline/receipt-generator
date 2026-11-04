@@ -9,3 +9,6 @@ _to_delete/
 /test-results/
 *.tsbuildinfo
 next-env.d.ts
+
+# dev data folder used when BILLGEN_DATA_DIR is not set (row 10)
+/.billgen-data/
