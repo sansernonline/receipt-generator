@@ -6,6 +6,7 @@
     "dev": "next dev -H 127.0.0.1 -p 3000",
     "build": "next build",
     "smoke": "node scripts/smoke.mjs",
+    "verify": "node test/e2e/verify.mjs",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test"
