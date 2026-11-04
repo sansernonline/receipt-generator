@@ -1,10 +1,12 @@
 import { createChat } from "@/features/chat/chats";
+import { isStaleChat } from "@/features/chat/stale-chat";
 import { isAllowedOrigin } from "@/features/chat/same-origin";
 import { createStore } from "@/features/storage/store";
 
 export async function GET() {
   const { chats } = await createStore().readIndex();
-  return Response.json({ chats });
+  const now = new Date();
+  return Response.json({ chats: chats.map((chat) => ({ ...chat, isStale: isStaleChat(chat.updatedAt, now) })) });
 }
 
 export async function POST(request: Request) {

@@ -74,8 +74,23 @@ test("a chat that is already in the loaded list is not listed twice after it is 
   const list = screen.getByRole("navigation", { name: "รายการแชต" });
   await within(list).findByRole("listitem");
 
-  fireEvent.click(screen.getByRole("button", { name: "แชตใหม่" }));
+  fireEvent.click(screen.getAllByRole("button", { name: "แชตใหม่" })[0]); // the list holds a chat with the same title; the new chat button comes first
 
-  await waitFor(() => expect(screen.getByRole("textbox", { name: "ข้อความ" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("textbox", { name: "ข้อความ" })).toHaveValue(""));
   expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+});
+
+test("text typed while a message is still sending stays in the box", async () => {
+  let finish: (res: Response) => void = () => undefined;
+  const pending = new Promise<Response>((resolve) => (finish = resolve));
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => (url.endsWith("/messages") ? pending : init?.method === "POST" ? Response.json({ chat: created }, { status: 201 }) : Response.json({ chats: [] }))));
+  render(<ChatShell />);
+  await sendText("แรก");
+  await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3));
+
+  fireEvent.change(screen.getByRole("textbox", { name: "ข้อความ" }), { target: { value: "พิมพ์ต่อ" } });
+  finish(Response.json({ chat: sent, message: { role: "user", text: "แรก" } }, { status: 201 }));
+
+  await screen.findByText("แรก", { selector: "p" });
+  expect(screen.getByRole("textbox", { name: "ข้อความ" })).toHaveValue("พิมพ์ต่อ");
 });

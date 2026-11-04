@@ -27,6 +27,12 @@ test("uses the Bangkok day, not UTC: 00:30 Bangkok on the 18th is today", () => 
   expect(groups.map((g) => g.label)).toEqual(["วันนี้"]);
 });
 
+test("[TC-CHAT-010] 23:59:59 Bangkok on the 17th is yesterday and 00:00:00 on the 18th is today", () => {
+  const groups = groupChatsByDay([chat("y", "2026-10-17T17:00:00Z"), chat("x", "2026-10-17T16:59:59Z")], NOW);
+
+  expect(groups.map((g) => [g.label, g.chats.map((c) => c.id)])).toEqual([["วันนี้", ["y"]], ["เมื่อวาน", ["x"]]]);
+});
+
 test("leaves out groups with no chats", () => {
   expect(groupChatsByDay([], NOW)).toEqual([]);
 });

@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("[FR-CHAT-020] new chat button adds an empty selected chat that survives reload", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("button", { name: "แชตใหม่" }).click();
+  await page.getByRole("button", { name: "แชตใหม่", exact: true }).first().click() // the list can hold chats with that title too; the new chat button comes first;
 
   const newest = page.getByRole("navigation", { name: "รายการแชต" }).getByRole("listitem").first();
   await expect(newest).toHaveText("แชตใหม่");

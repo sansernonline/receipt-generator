@@ -1,9 +1,8 @@
 import { isAllowedOrigin } from "@/features/chat/same-origin";
 import { addUserMessage, MAX_MESSAGE_CHARS } from "@/features/chat/messages";
-import { createStore } from "@/features/storage/store";
+import { failure, storageFailure } from "@/features/chat/route-errors";
 import { isValidId } from "@/features/storage/ids";
-
-const fail = (error: string, status: number) => Response.json({ error }, { status });
+import { createStore } from "@/features/storage/store";
 
 async function readText(request: Request): Promise<string | null> {
   const body = await request.json().catch(() => null);
@@ -12,15 +11,14 @@ async function readText(request: Request): Promise<string | null> {
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!isAllowedOrigin(request)) return fail("forbidden", 403);
+  if (!isAllowedOrigin(request)) return failure("forbidden", 403);
   const { id } = await params;
-  if (!isValidId(id)) return fail("รหัสแชตไม่ถูกต้อง", 400);
+  if (!isValidId(id)) return failure("รหัสแชตไม่ถูกต้อง", 400);
   const text = await readText(request);
-  if (text === null) return fail("ข้อความว่างหรือยาวเกิน 10,000 ตัวอักษร", 400);
+  if (text === null) return failure("ข้อความว่างหรือยาวเกิน 10,000 ตัวอักษร", 400);
   try {
     return Response.json(await addUserMessage(createStore(), id, text), { status: 201 });
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return fail("ไม่พบแชตนี้", 404);
-    return fail("บันทึกข้อความไม่สำเร็จ ลองอีกครั้ง", 500); // never echo the error: it can hold a file path
+    return storageFailure(error, "บันทึกข้อความไม่สำเร็จ ลองอีกครั้ง");
   }
 }

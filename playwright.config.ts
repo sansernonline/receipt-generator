@@ -12,6 +12,7 @@ if (!process.env.TEST_WORKER_INDEX) {
 
 export default defineConfig({
   testDir: "./e2e",
+  workers: 1, // all tests share one data folder and one chat list; parallel tests would reorder each other's list
   timeout: 60_000, // first page load compiles on demand in next dev
   webServer: {
     command: `npx next dev -H 127.0.0.1 -p ${port}`,

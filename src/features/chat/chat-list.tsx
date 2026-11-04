@@ -1,10 +1,25 @@
 import { groupChatsByDay, type ChatListItem } from "./group-chats";
 
-type Props = { chats: ChatListItem[]; activeId: string | null; now: Date; isBusy: boolean; hasListError: boolean; hasCreateError: boolean; onNewChat: () => void };
+type Props = {
+  chats: ChatListItem[];
+  activeId: string | null;
+  now: Date;
+  isBusy: boolean;
+  isDrawerOpen: boolean;
+  hasListError: boolean;
+  hasCreateError: boolean;
+  onNewChat: () => void;
+  onOpen: (id: string) => void;
+};
 
-export function ChatList({ chats, activeId, now, isBusy, hasListError, hasCreateError, onNewChat }: Props) {
+export function ChatList({ chats, activeId, now, isBusy, isDrawerOpen, hasListError, hasCreateError, onNewChat, onOpen }: Props) {
   return (
-    <aside className="hidden flex-col border-r border-line bg-white lg:flex">
+    // below lg the list is a drawer that slides over the chat; invisible while closed so it cannot take focus
+    <aside
+      aria-label="ประวัติแชต"
+      data-open={isDrawerOpen}
+      className="absolute inset-y-0 left-0 z-50 flex w-[280px] -translate-x-full flex-col border-r border-line bg-white shadow-xl transition-[transform,visibility] duration-200 max-lg:invisible data-[open=true]:visible data-[open=true]:translate-x-0 lg:static lg:w-auto lg:translate-x-0 lg:shadow-none"
+    >
       <div className="p-4 font-head text-base font-semibold tracking-wider">BILLGEN</div>
       <button
         type="button"
@@ -36,9 +51,16 @@ export function ChatList({ chats, activeId, now, isBusy, hasListError, hasCreate
                 <li
                   key={chat.id}
                   aria-current={chat.id === activeId ? "true" : undefined}
-                  className="rounded-lg px-2 py-2 aria-[current=true]:bg-surface-2 aria-[current=true]:font-semibold"
+                  className="rounded-lg aria-[current=true]:bg-surface-2 aria-[current=true]:font-semibold aria-[current=true]:shadow-[inset_3px_0_0_var(--color-accent)]"
                 >
-                  {chat.title}
+                  <button type="button" onClick={() => onOpen(chat.id)} className="flex w-full items-center gap-2 px-2 py-2 text-left hover:bg-surface-2">
+                    <span className="min-w-0 flex-1 break-words">{chat.title}</span>
+                    {chat.isStale && (
+                      <span title="ไม่ได้แก้ไขเกิน 5 ปี" className="shrink-0 rounded bg-surface-2 px-1.5 text-[11px] font-normal text-accent">
+                        เกิน 5 ปี
+                      </span>
+                    )}
+                  </button>
                 </li>
               ))}
             </ul>

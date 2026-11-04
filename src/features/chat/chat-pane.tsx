@@ -10,11 +10,13 @@ type Props = {
   text: string;
   isBusy: boolean;
   hasSendError: boolean;
+  openError: string | null;
+  onOpenDrawer: () => void;
   onTextChange: (text: string) => void;
   onSend: () => void;
 };
 
-export function ChatPane({ title, messages, text, isBusy, hasSendError, onTextChange, onSend }: Props) {
+export function ChatPane({ title, messages, text, isBusy, hasSendError, openError, onOpenDrawer, onTextChange, onSend }: Props) {
   function submit(event: FormEvent) {
     event.preventDefault();
     onSend();
@@ -22,13 +24,23 @@ export function ChatPane({ title, messages, text, isBusy, hasSendError, onTextCh
 
   return (
     <main className="flex min-h-0 flex-col bg-white">
-      <header className="flex h-[52px] items-center px-4">
+      <header className="flex h-[52px] items-center gap-2 px-4">
+        <button type="button" onClick={onOpenDrawer} aria-label="เปิดประวัติแชต" className="-ml-2 grid size-9 place-items-center rounded-full hover:bg-surface-2 lg:hidden">
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current" strokeWidth="2" strokeLinecap="round">
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+        </button>
         <h1 className="font-head text-lg font-semibold">{title}</h1>
       </header>
       <section aria-label="บทสนทนา" className="flex flex-1 flex-col gap-2 overflow-auto p-4 text-sm">
-        {messages.length === 0 && <p className="text-ink-3">พิมพ์ข้อมูลร้านและรายการสินค้าเพื่อเริ่มออกบิล</p>}
+        {openError && (
+          <p role="alert" className="text-accent">
+            {openError}
+          </p>
+        )}
+        {messages.length === 0 && !openError && <p className="text-ink-3">พิมพ์ข้อมูลร้านและรายการสินค้าเพื่อเริ่มออกบิล</p>}
         {messages.map((message, index) => (
-          <p key={index} className="max-w-[85%] self-end whitespace-pre-wrap break-words rounded-2xl bg-surface-2 px-3 py-2">
+          <p key={index} className="max-w-[85%] self-end whitespace-pre-wrap break-words rounded-2xl bg-accent-fill px-3 py-2 text-white">
             {message.text}
           </p>
         ))}
