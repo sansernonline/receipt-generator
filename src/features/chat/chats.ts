@@ -12,6 +12,6 @@ export async function createChat(store: Store, now: Date = new Date()) {
   // simple: draft shape is the minimum TC-CHAT-033 checks; the bill editing rows extend it
   await store.writeJsonAtomic(path.join(dir, "draft.json"), { items: [], bill: { customerName: null, billNumber: null } });
   await store.writeJsonAtomic(path.join(dir, "chat.json"), chat);
-  await store.rebuildIndex();
+  await store.upsertIndex(chat);
   return { id, title: chat.title, updatedAt: stamp, shopId: null };
 }
