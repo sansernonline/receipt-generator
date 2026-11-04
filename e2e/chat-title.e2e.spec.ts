@@ -9,7 +9,7 @@ test("[FR-CHAT-030] the first message names the chat, HTML stays text, and the t
   await page.goto("/");
 
   await page.getByRole("textbox", { name: "ข้อความ" }).fill(text);
-  await page.getByRole("button", { name: "ส่ง" }).click();
+  await page.getByRole("button", { name: "ส่ง", exact: true }).click();
 
   const item = page.getByRole("navigation", { name: "รายการแชต" }).getByRole("listitem").filter({ hasText: text });
   await expect(item).toHaveText(text, { timeout: 20_000 }); // the first send can wait on a slow dev compile

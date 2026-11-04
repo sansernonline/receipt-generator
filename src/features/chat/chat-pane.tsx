@@ -1,6 +1,5 @@
-import type { FormEvent } from "react";
-
-const QUICK_COMMANDS = ["ลดท้ายบิล 10%", "VAT ไม่มี", "VAT รวมในราคา", "VAT แยกนอก"];
+import { useRef, type FormEvent } from "react";
+import { chipsFor, type ChatStage } from "./quick-chips";
 
 export type ChatMessage = { role: string; text: string };
 
@@ -8,15 +7,24 @@ type Props = {
   title: string;
   messages: ChatMessage[];
   text: string;
+  stage: ChatStage;
   isBusy: boolean;
   hasSendError: boolean;
   openError: string | null;
   onOpenDrawer: () => void;
   onTextChange: (text: string) => void;
+  onFillText: (text: string) => void;
   onSend: () => void;
 };
 
-export function ChatPane({ title, messages, text, isBusy, hasSendError, openError, onOpenDrawer, onTextChange, onSend }: Props) {
+export function ChatPane({ title, messages, text, stage, isBusy, hasSendError, openError, onOpenDrawer, onTextChange, onFillText, onSend }: Props) {
+  const boxRef = useRef<HTMLTextAreaElement>(null);
+
+  function fillBox(fillText: string) {
+    onFillText(fillText);
+    boxRef.current?.focus();
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
     onSend();
@@ -46,10 +54,15 @@ export function ChatPane({ title, messages, text, isBusy, hasSendError, openErro
         ))}
       </section>
       <div className="p-3">
-        {/* simple: ชิปยังไม่มีพฤติกรรม — ปิดปุ่มไว้ ต่อใน FR-CHAT-110 */}
-        <div role="group" aria-label="คำสั่งด่วน" className="mb-2 flex flex-wrap gap-2">
-          {QUICK_COMMANDS.map((label) => (
-            <button key={label} type="button" disabled className="h-8 rounded-full border border-line-2 px-3 text-xs opacity-60">
+        <div role="group" aria-label="คำสั่งด่วน" className="mb-2 flex gap-2 overflow-x-auto lg:flex-wrap">
+          {chipsFor(stage).map(({ label, fillText }) => (
+            <button
+              key={label}
+              type="button"
+              disabled={fillText === undefined}
+              onClick={() => fillText !== undefined && fillBox(fillText)}
+              className="h-8 shrink-0 whitespace-nowrap rounded-full border border-line-2 px-3 text-xs hover:border-accent enabled:hover:bg-surface-2 disabled:opacity-50"
+            >
               {label}
             </button>
           ))}
@@ -61,6 +74,7 @@ export function ChatPane({ title, messages, text, isBusy, hasSendError, openErro
         )}
         <form onSubmit={submit} className="flex items-end gap-2 rounded-[22px] border border-line-2 p-2">
           <textarea
+            ref={boxRef}
             aria-label="ข้อความ"
             rows={1}
             value={text}

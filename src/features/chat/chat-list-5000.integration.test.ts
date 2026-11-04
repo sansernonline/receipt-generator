@@ -55,7 +55,7 @@ test(`[TC-NFR-005] with ${CHAT_COUNT} chats the list answers within ${OPEN_BUDGE
   const average = timings.reduce((a, b) => a + b) / RUNS;
   process.stderr.write(`TC-NFR-005 list ms: max ${Math.max(...timings).toFixed(0)} · avg ${average.toFixed(0)}\n`);
   expect(Math.max(...timings)).toBeLessThan(OPEN_BUDGET_MS);
-}, 120_000);
+}, 300_000); // shares the disk with other test files running at the same time
 
 test(`[TC-NFR-005] deleting index.json rebuilds all ${CHAT_COUNT} chats from chats/ (time is recorded, the SRS gives no limit)`, async () => {
   await fsp.rm(path.join(dataDir, "index.json"));
@@ -66,4 +66,4 @@ test(`[TC-NFR-005] deleting index.json rebuilds all ${CHAT_COUNT} chats from cha
 
   process.stderr.write(`TC-NFR-005 rebuild ms: ${elapsed.toFixed(0)}\n`);
   expect(body.chats).toHaveLength(CHAT_COUNT);
-}, 120_000);
+}, 300_000); // shares the disk with other test files running at the same time

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChatList } from "./chat-list";
 import { ChatPane, type ChatMessage } from "./chat-pane";
 import type { ChatListItem } from "./group-chats";
+import { stageOf, type ChatStage } from "./quick-chips";
 
 export function ChatShell() {
   const [chats, setChats] = useState<ChatListItem[]>([]);
@@ -12,6 +13,7 @@ export function ChatShell() {
   const [hasCreateError, setHasCreateError] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
+  const [stage, setStage] = useState<ChatStage>("no-shop");
   const [hasSendError, setHasSendError] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -36,10 +38,11 @@ export function ChatShell() {
   // a late list response can already contain the chat, so never add the same id twice
   const putOnTop = (chat: ChatListItem) => setChats((current) => [chat, ...current.filter((item) => item.id !== chat.id)]);
 
-  function showChat(id: string, shownMessages: ChatMessage[]) {
+  function showChat(id: string, shownMessages: ChatMessage[], shownStage: ChatStage = "no-shop") {
     latestOpen.current += 1; // a reply still on its way for an earlier click is now out of date
     setActiveId(id);
     setMessages(shownMessages);
+    setStage(shownStage);
     setText("");
     setOpenError(null);
     setHasSendError(false);
@@ -75,7 +78,7 @@ export function ChatShell() {
       const body = await res.json().catch(() => null);
       if (ticket !== latestOpen.current) return;
       if (!res.ok) return setOpenError(typeof body?.error === "string" ? body.error : "เปิดแชตไม่ได้ ลองอีกครั้ง");
-      showChat(id, body.chat.messages);
+      showChat(id, body.chat.messages, stageOf(body.chat, body.draft));
     } catch {
       if (ticket === latestOpen.current) setOpenError("เปิดแชตไม่ได้ ลองอีกครั้ง");
     }
@@ -110,7 +113,7 @@ export function ChatShell() {
     <div className="h-screen bg-desk p-0 lg:p-2.5">
       <div className="relative grid h-full overflow-hidden bg-white lg:grid-cols-[288px_minmax(440px,1.1fr)_minmax(360px,560px)] lg:rounded-2xl lg:border lg:border-line lg:shadow-sm">
         <ChatList chats={chats} activeId={activeId} now={new Date()} isBusy={isBusy} isDrawerOpen={isDrawerOpen} hasListError={hasListError} hasCreateError={hasCreateError} onNewChat={startNewChat} onOpen={openChat} />
-        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} isBusy={isBusy} hasSendError={hasSendError} openError={openError} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onSend={sendMessage} />
+        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} hasSendError={hasSendError} openError={openError} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={sendMessage} />
         {isDrawerOpen && <button type="button" aria-label="ปิดประวัติแชต" onClick={() => setIsDrawerOpen(false)} className="absolute inset-0 z-40 bg-black/40 lg:hidden" />}
         <section aria-label="ตัวอย่างบิล" className="hidden items-center justify-center border-l border-line bg-desk text-sm text-ink-3 lg:flex">
           ตัวอย่างบิลจะแสดงที่นี่

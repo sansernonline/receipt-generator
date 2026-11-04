@@ -7,7 +7,7 @@ test("[TC-CHAT-012] a chat with 6 messages opens complete from the list in a bra
   await page.goto("/");
   for (const text of [title, "สอง", "สาม", "สี่", "ห้า", "หก"]) {
     await page.getByRole("textbox", { name: "ข้อความ" }).fill(text);
-    await page.getByRole("button", { name: "ส่ง" }).click();
+    await page.getByRole("button", { name: "ส่ง", exact: true }).click();
     await expect(page.getByRole("region", { name: "บทสนทนา" }).getByText(text, { exact: true })).toBeVisible({ timeout: 20_000 });
   }
 
