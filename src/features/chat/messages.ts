@@ -2,7 +2,7 @@ import path from "node:path";
 import { titleFromMessage } from "@/features/chat/chat-title";
 import type { Store } from "@/features/storage/store";
 
-export const MAX_MESSAGE_CHARS = 10_000; // size guard for input that arrives from outside
+export const MAX_MESSAGE_CHARS = 10_000; // visible characters; size guard for input that arrives from outside
 
 type StoredChat = { id: string; title: string; updatedAt: string; shopId: string | null; billNumber: string | null; customerName: string | null; messages: { role: string; text: string; createdAt: string }[] };
 

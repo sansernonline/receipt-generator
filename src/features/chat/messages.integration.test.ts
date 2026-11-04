@@ -114,3 +114,11 @@ describe("POST /api/chats/[id]/messages", () => {
     expect(JSON.stringify(await res.json())).not.toMatch(/billgen-messages|SyntaxError|at /);
   });
 });
+
+test("the 10,000 limit counts visible characters: 5,000 emoji families (40,000 code units) are accepted", async () => {
+  const id = await newChatId();
+
+  const res = await send(id, { text: "👨‍👩‍👧".repeat(5000) });
+
+  expect(res.status).toBe(201);
+});

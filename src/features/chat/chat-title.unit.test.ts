@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { titleFromMessage } from "./chat-title";
+import { countChars, titleFromMessage } from "./chat-title";
 
 const graphemes = (text: string) => [...new Intl.Segmenter("th", { granularity: "grapheme" }).segment(text)].length;
 
@@ -32,4 +32,12 @@ test("turns line breaks and repeated spaces into single spaces", () => {
 
 test("keeps HTML as literal text", () => {
   expect(titleFromMessage("<script>alert(1)</script> ร้านกาแฟ")).toBe("<script>alert(1)</script> ร้านกาแฟ");
+});
+
+test("drops control characters and direction-override characters from the title", () => {
+  expect(titleFromMessage("ร้าน\u0007กาแฟ\u202Eabc\u2066def\u2069\u0000")).toBe("ร้านกาแฟabcdef");
+});
+
+test("counts visible characters for the message limit, so one emoji family is 1 not 8", () => {
+  expect(countChars("👨‍👩‍👧".repeat(3))).toBe(3);
 });

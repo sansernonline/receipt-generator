@@ -1,4 +1,5 @@
 import { isAllowedOrigin } from "@/features/chat/same-origin";
+import { countChars } from "@/features/chat/chat-title";
 import { addUserMessage, MAX_MESSAGE_CHARS } from "@/features/chat/messages";
 import { failure, storageFailure } from "@/features/chat/route-errors";
 import { isValidId } from "@/features/storage/ids";
@@ -7,7 +8,8 @@ import { createStore } from "@/features/storage/store";
 async function readText(request: Request): Promise<string | null> {
   const body = await request.json().catch(() => null);
   const text = typeof body?.text === "string" ? body.text : "";
-  return text.trim() && text.length <= MAX_MESSAGE_CHARS ? text : null;
+  const isTooLong = text.length > MAX_MESSAGE_CHARS * 10 || countChars(text) > MAX_MESSAGE_CHARS; // length check first: counting a huge body is slow
+  return text.trim() && !isTooLong ? text : null;
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
