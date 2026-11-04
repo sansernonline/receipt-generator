@@ -1,15 +1,21 @@
 // build standalone → start on 127.0.0.1 → GET / must be 200 → stop
+// builds into its own folder: a production build in .next breaks the dev servers that e2e/verify start there
 import { spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync } from "node:fs";
 
 const url = "http://127.0.0.1:3200";
-const build = spawnSync("npx", ["next", "build"], { stdio: "inherit", shell: true });
+const dist = ".next-smoke";
+const build = spawnSync("npx", ["next", "build"], {
+  stdio: "inherit",
+  shell: true,
+  env: { ...process.env, NEXT_DIST_DIR: dist },
+});
 if (build.status !== 0) process.exit(build.status ?? 1);
 
-cpSync(".next/static", ".next/standalone/.next/static", { recursive: true });
-if (existsSync("public")) cpSync("public", ".next/standalone/public", { recursive: true });
+cpSync(`${dist}/static`, `${dist}/standalone/${dist}/static`, { recursive: true });
+if (existsSync("public")) cpSync("public", `${dist}/standalone/public`, { recursive: true });
 
-const server = spawn("node", [".next/standalone/server.js"], {
+const server = spawn("node", [`${dist}/standalone/server.js`], {
   env: { ...process.env, HOSTNAME: "127.0.0.1", PORT: "3200" },
   stdio: "inherit",
 });
