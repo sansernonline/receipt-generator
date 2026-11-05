@@ -75,4 +75,16 @@ describe("createImageLimiter (20 pictures per minute, whole system)", () => {
 
     expect(limiter.take(12)).toEqual({ ok: false, waitSeconds: 50 }); // needs 2 of the second batch to leave: 30 + 60 - 40
   });
+
+  it("[review] a clock that jumps back does not free or break the window", () => {
+    const { clock, limiter } = setup();
+    clock.ms = sec(100);
+    limiter.take(20);
+
+    clock.ms = sec(50);
+    const result = limiter.take(1);
+
+    expect(result.ok).toBe(false);
+    expect((result as { waitSeconds: number }).waitSeconds).toBeLessThanOrEqual(60);
+  });
 });

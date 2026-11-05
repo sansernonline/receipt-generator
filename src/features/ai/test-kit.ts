@@ -25,7 +25,7 @@ export function useAiStub() {
   afterEach(() => state.stub.close());
 
   const configFor = (over: Partial<AiConfig> = {}): AiConfig => ({
-    baseUrl: state.stub.baseUrl, apiKey: KEY, modelText: "m-text", modelOcr: "typhoon-ocr", maxTokens: 8192, timeoutMs: 60_000, ...over,
+    baseUrl: state.stub.baseUrl, apiKey: KEY, modelText: "m-text", modelOcr: "typhoon-ocr", maxTokens: 8192, timeoutMs: 60_000, maxChunks: 5, ...over,
   });
   const ask = (i: AskAiInput = input(), deps: Partial<AskAiDeps> = {}) =>
     askAi(i, { config: configFor(), log: (e) => state.logs.push(e), canary: CANARY, imageLimiter: createImageLimiter(), ...deps });

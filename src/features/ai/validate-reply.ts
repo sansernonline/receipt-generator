@@ -20,18 +20,22 @@ const MAX_DESCRIPTION = 500;
 const MAX_PAYMENT_DETAIL = 300;
 const MAX_QUOTE_REF = 30;
 const MAX_QUOTED_BY = 80;
+const MAX_REMARKS = 500; // FR-TOT-090
+// Self-set safe ceilings (SRS 6.2 gives none for these): keep absurd values from the model out of the bill
+const MAX_TEXT = 500;
+const MAX_NUMBER = 1e9;
 
 type Check = (value: unknown) => string | null;
 type Fields = Record<string, Check>;
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-const number: Check = (v) => (typeof v === "number" && Number.isFinite(v) ? null : "ต้องเป็นตัวเลข");
+const number: Check = (v) => (typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= MAX_NUMBER ? null : "ต้องเป็นตัวเลขที่ไม่เกิน 1,000,000,000");
 const positive: Check = (v) => number(v) ?? ((v as number) > 0 ? null : "ต้องมากกว่า 0");
 const notNegative: Check = (v) => number(v) ?? ((v as number) >= 0 ? null : "ต้องไม่ติดลบ");
 const line: Check = (v) => (Number.isInteger(v) && (v as number) >= 1 ? null : "ต้องเป็นเลขบรรทัด");
-const text = (max?: number): Check => (v) =>
-  typeof v !== "string" || v.length < 1 ? "ต้องเป็นข้อความที่ไม่ว่าง" : max && v.length > max ? `ยาวเกิน ${max} ตัวอักษร` : null;
+const text = (max = MAX_TEXT): Check => (v) =>
+  typeof v !== "string" || v.length < 1 ? "ต้องเป็นข้อความที่ไม่ว่าง" : v.length > max ? `ยาวเกิน ${max} ตัวอักษร` : null;
 const orNull = (check: Check): Check => (v) => (v === null ? null : check(v));
 const oneOf = (...allowed: (string | null)[]): Check => (v) => (allowed.includes(v as string | null) ? null : "ค่าไม่อยู่ในรายการที่ใช้ได้");
 const percentOrAmount: Check = (v) => oneOf("amount", "percent")(v);
@@ -73,17 +77,16 @@ const operationFields: Record<string, Fields> = {
   set_vat_mode: { mode: oneOf("none", "included", "excluded") },
   set_payment: { method: oneOf("cash", "transfer", "cheque", null), date: orNull(date) },
   set_payment_detail: { text: orNull(text(MAX_PAYMENT_DETAIL)) },
-  set_remarks: { text: (v) => (typeof v === "string" ? null : "ต้องเป็นข้อความ") },
+  set_remarks: { text: (v) => (typeof v === "string" && v.length <= MAX_REMARKS ? null : `ต้องเป็นข้อความไม่เกิน ${MAX_REMARKS} ตัวอักษร`) },
   set_bill_info: { fields: (v) => partial(v, billInfoFields) },
 };
 
 /** Every listed field must be present, no other field may appear. */
 function object(value: unknown, fields: Fields): string | null {
   if (!isObject(value)) return "ต้องเป็นออบเจกต์";
-  const extra = Object.keys(value).find((k) => !(k in fields));
-  if (extra) return `มีช่องที่ไม่รู้จัก ${JSON.stringify(extra)}`;
+  if (Object.keys(value).some((k) => !Object.hasOwn(fields, k))) return "มีช่องที่ไม่รู้จัก";
   for (const [key, check] of Object.entries(fields)) {
-    if (!(key in value)) return `ขาดช่อง ${key}`;
+    if (!Object.hasOwn(value, key)) return `ขาดช่อง ${key}`;
     const problem = check(value[key]);
     if (problem) return `${key}: ${problem}`;
   }
@@ -93,8 +96,7 @@ function object(value: unknown, fields: Fields): string | null {
 /** At least one listed field, none outside the list. */
 function partial(value: unknown, fields: Fields): string | null {
   if (!isObject(value) || Object.keys(value).length === 0) return "ต้องมีอย่างน้อย 1 ช่อง";
-  const extra = Object.keys(value).find((k) => !(k in fields));
-  if (extra) return `มีช่องที่ไม่รู้จัก ${JSON.stringify(extra)}`;
+  if (Object.keys(value).some((k) => !Object.hasOwn(fields, k))) return "มีช่องที่ไม่รู้จัก";
   for (const [key, v] of Object.entries(value)) {
     const problem = fields[key](v);
     if (problem) return `${key}: ${problem}`;
@@ -103,7 +105,7 @@ function partial(value: unknown, fields: Fields): string | null {
 }
 
 function operationProblem(op: unknown, lineCount: number): string | null {
-  if (!isObject(op) || typeof op.op !== "string" || !(op.op in operationFields)) return "op: ไม่อยู่ในชุดคำสั่งที่ใช้ได้";
+  if (!isObject(op) || typeof op.op !== "string" || !Object.hasOwn(operationFields, op.op)) return "op: ไม่อยู่ในชุดคำสั่งที่ใช้ได้";
   const { op: _name, ...rest } = op;
   const problem = object(rest, operationFields[op.op]);
   if (problem) return problem;
@@ -143,6 +145,14 @@ function statusProblem(r: Reply): string | null {
 
 /** Problems are short Thai lines without any value from the reply (a value could carry injected text). */
 export function parseReply(raw: string, context: { lineCount: number }): ParseResult {
+  try {
+    return check(raw, context);
+  } catch {
+    return { ok: false, errors: ["รูปแบบผลไม่ถูกต้อง"] }; // never let an odd reply escape as an exception
+  }
+}
+
+function check(raw: string, context: { lineCount: number }): ParseResult {
   const json = extractJson(raw);
   const shape = object(json, replyFields);
   if (shape) return { ok: false, errors: [shape] };

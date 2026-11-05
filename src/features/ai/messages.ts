@@ -5,3 +5,5 @@ export const MESSAGE_INTERNAL_INFO = "ข้อมูลภายในของ
 export const MESSAGE_TOO_LONG = "ข้อความยาวได้ไม่เกิน 10,000 ตัวอักษร"; // FR-AI-080
 export const MESSAGE_TOO_MANY_IMAGES = "ส่งรูปได้ครั้งละไม่เกิน 20 รูป";
 export const messageWaitForImages = (seconds: number) => `อ่านรูปได้ไม่เกิน 20 รูปต่อนาที กรุณารอ ${seconds} วินาทีแล้วส่งใหม่`; // FR-AI-120
+export const MESSAGE_TOO_LONG_INPUT = "ข้อมูลที่ส่งยาวเกินไปที่จะอ่านครั้งเดียว ลองส่งทีละน้อย";
+export const MESSAGE_PARTIAL_OCR = "(อ่านจากรูปได้บางส่วน เพราะข้อความในรูปยาวเกินไป)";

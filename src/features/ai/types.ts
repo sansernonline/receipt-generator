@@ -8,11 +8,12 @@ export type AiConfig = {
   /** Ceiling shared by prompt and answer (ARCH R-03); real value not measured yet. */
   maxTokens: number;
   timeoutMs: number;
+  maxChunks: number;
 };
 
 export type AiLogEntry = {
   at: string;
-  event: "call" | "leak";
+  event: "call" | "leak" | "error";
   chatId?: string;
   promptId?: string;
   promptVersion?: string;
@@ -45,7 +46,7 @@ export type AskAiDeps = {
   imageLimiter?: ImageLimiter;
 };
 
-export type AskAiFailure = "message_too_long" | "rate_limited" | "ai_unreachable" | "invalid_reply" | "refused" | "leak";
+export type AskAiFailure = "message_too_long" | "rate_limited" | "ai_unreachable" | "invalid_reply" | "refused" | "leak" | "too_long_input";
 
 /** ok:true = operations may be applied (empty + reply = a question for the user). ok:false = draft stays as it is. */
 export type AskAiResult =

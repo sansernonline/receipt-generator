@@ -5,6 +5,7 @@ const DEFAULT_MODEL_TEXT = "typhoon-v2.5-30b-a3b-instruct";
 const DEFAULT_MODEL_OCR = "typhoon-ocr";
 const DEFAULT_MAX_TOKENS = 8192; // ARCH R-03 ceiling, not measured (no real key yet)
 const DEFAULT_TIMEOUT_MS = 60_000; // IF-AI-010
+const DEFAULT_MAX_CHUNKS = 5; // AI calls one command may need for picture text; keeps cost and wait bounded
 
 function positiveInt(value: string | undefined, fallback: number) {
   const n = Number(value);
@@ -20,5 +21,6 @@ export function loadAiConfig(env: Record<string, string | undefined> = process.e
     modelOcr: env.AI_MODEL_OCR || DEFAULT_MODEL_OCR,
     maxTokens: positiveInt(env.AI_MAX_TOKENS, DEFAULT_MAX_TOKENS),
     timeoutMs: positiveInt(env.AI_TIMEOUT_MS, DEFAULT_TIMEOUT_MS),
+    maxChunks: positiveInt(env.AI_MAX_CHUNKS, DEFAULT_MAX_CHUNKS),
   };
 }

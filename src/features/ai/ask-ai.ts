@@ -6,7 +6,7 @@ import { AiCallError, complete, ocrPage } from "./connector";
 import { IMAGE_LIMIT_PER_MINUTE, sharedImageLimiter } from "./image-limiter";
 import { hasLeak } from "./leak";
 import { refusalMessage } from "./refusals";
-import { MESSAGE_AI_UNREACHABLE, MESSAGE_INTERNAL_INFO, MESSAGE_INVALID_REPLY, MESSAGE_TOO_LONG, MESSAGE_TOO_MANY_IMAGES, messageWaitForImages } from "./messages";
+import { MESSAGE_AI_UNREACHABLE, MESSAGE_INTERNAL_INFO, MESSAGE_INVALID_REPLY, MESSAGE_TOO_LONG, MESSAGE_TOO_LONG_INPUT, MESSAGE_PARTIAL_OCR, MESSAGE_TOO_MANY_IMAGES, messageWaitForImages } from "./messages";
 import {
   DEFAULT_IMAGE_REQUEST, PROMPT_ID, PROMPT_VERSION, SERVER_CANARY,
   bangkokDate, buildRetryMessage, buildSystem, buildUserMessage, fitHistory,
@@ -30,30 +30,40 @@ class LeakDetected extends Error {}
  * on any failure the caller simply keeps it as it is.
  */
 export async function askAi(input: AskAiInput, deps: AskAiDeps): Promise<AskAiResult> {
-  // The chat route checks this too; kept here so no caller can reach the AI with a longer text (FR-AI-080)
-  if (countChars(input.userText) > MAX_MESSAGE_CHARS) return failed("message_too_long", MESSAGE_TOO_LONG);
-  const refusedImages = checkImageLimit(input, deps);
-  if (refusedImages) return refusedImages;
   const ctx: Ctx = { ...deps, log: deps.log ?? defaultLog, now: deps.now ?? (() => new Date()), canary: deps.canary ?? SERVER_CANARY };
   try {
-    const system = buildSystem(ctx.canary);
-    const replies: Reply[] = [];
-    for (const user of await userMessagesFor(input, ctx, system)) {
-      const reply = await readCommand(input, ctx, system, user);
-      if (!reply) return failed("invalid_reply", MESSAGE_INVALID_REPLY);
-      if (reply.status === "refuse") return failed("refused", refusalMessage(reply.reason, reply.action));
-      replies.push(reply);
-    }
-    return joinReplies(replies);
+    return await run(input, ctx);
   } catch (error) {
     if (error instanceof AiCallError) return failed("ai_unreachable", MESSAGE_AI_UNREACHABLE);
     if (error instanceof LeakDetected) return failed("leak", MESSAGE_INTERNAL_INFO);
-    throw error;
+    // Anything else is our own bug: say nothing about it to the user, log only that it happened
+    ctx.log({ at: ctx.now().toISOString(), event: "error", chatId: input?.chatId });
+    return failed("ai_unreachable", MESSAGE_AI_UNREACHABLE);
   }
 }
 
+async function run(input: AskAiInput, ctx: Ctx): Promise<AskAiResult> {
+  // The chat route checks this too; kept here so no caller can reach the AI with a longer text (FR-AI-080)
+  if (countChars(input.userText) > MAX_MESSAGE_CHARS) return failed("message_too_long", MESSAGE_TOO_LONG);
+  const refusedImages = checkImageLimit(input, ctx);
+  if (refusedImages) return refusedImages;
+
+  const system = buildSystem(ctx.canary);
+  const { messages, isPartial } = await userMessagesFor(input, ctx, system);
+  if (messages.length > ctx.config.maxChunks) return failed("too_long_input", MESSAGE_TOO_LONG_INPUT);
+
+  const replies: Reply[] = [];
+  for (const user of messages) {
+    const reply = await readCommand(input, ctx, system, user);
+    if (!reply) return failed("invalid_reply", MESSAGE_INVALID_REPLY);
+    if (reply.status === "refuse") return failed("refused", refusalMessage(reply.reason, reply.action));
+    replies.push(reply);
+  }
+  return joinReplies(replies, isPartial);
+}
+
 /** Counts the pictures of this message against the per-minute limit before any OCR call (FR-AI-090 · 120). */
-function checkImageLimit(input: AskAiInput, deps: AskAiDeps): Failure | null {
+function checkImageLimit(input: AskAiInput, deps: Ctx): Failure | null {
   const count = input.images?.length ?? 0;
   if (count === 0) return null;
   if (count > IMAGE_LIMIT_PER_MINUTE) return failed("rate_limited", MESSAGE_TOO_MANY_IMAGES);
@@ -62,21 +72,23 @@ function checkImageLimit(input: AskAiInput, deps: AskAiDeps): Failure | null {
 }
 
 /** One message without pictures; with pictures, one per piece of text that fits the token budget. */
-async function userMessagesFor(input: AskAiInput, ctx: Ctx, system: string): Promise<string[]> {
+async function userMessagesFor(input: AskAiInput, ctx: Ctx, system: string): Promise<{ messages: string[]; isPartial: boolean }> {
   const base = { today: bangkokDate(ctx.now()), draft: input.draft };
   const fixedChars = system.length + JSON.stringify(input.draft).length + input.userText.length;
   const budget = inputBudgetChars(ctx.config, fixedChars);
 
   if (!input.images?.length) {
     const history = fitHistory(input.chatHistory ?? [], budget);
-    return [buildUserMessage({ ...base, history, userText: input.userText })];
+    return { messages: [buildUserMessage({ ...base, history, userText: input.userText })], isPartial: false };
   }
   // simple: a picture request is self-contained, so no history goes with it (P-003 does not use it either)
-  const userText = input.userText || DEFAULT_IMAGE_REQUEST;
   const texts = await readPictures(input, ctx);
-  return texts.flatMap((text) =>
-    splitForBudget(text.slice(0, MAX_OCR_CHARS), Math.max(budget, MIN_CHUNK_CHARS)).map((ocrText) => buildUserMessage({ ...base, history: [], ocrText, userText })),
+  const pieces = texts.flatMap((text) => splitForBudget(text.slice(0, MAX_OCR_CHARS), Math.max(budget, MIN_CHUNK_CHARS)));
+  // the user's own words go with the first piece only; the others would repeat up to 10,000 characters each
+  const messages = pieces.map((ocrText, i) =>
+    buildUserMessage({ ...base, history: [], ocrText, userText: i === 0 ? input.userText || DEFAULT_IMAGE_REQUEST : DEFAULT_IMAGE_REQUEST }),
   );
+  return { messages, isPartial: texts.some((t) => t.length > MAX_OCR_CHARS) };
 }
 
 async function readPictures(input: AskAiInput, ctx: Ctx): Promise<string[]> {
@@ -110,8 +122,8 @@ async function attempt(ctx: Ctx, input: AskAiInput, system: string, user: string
   return parsed;
 }
 
-function joinReplies(replies: Reply[]): AskAiResult {
+function joinReplies(replies: Reply[], isPartial: boolean): AskAiResult {
   const operations: Operation[] = replies.flatMap((r) => r.operations);
-  const text = replies.map((r) => (r.status === "clarify" ? r.question : r.reply)).join(" ");
+  const text = [...replies.map((r) => (r.status === "clarify" ? r.question : r.reply)), ...(isPartial ? [MESSAGE_PARTIAL_OCR] : [])].join(" ");
   return { ok: true, operations, reply: text };
 }

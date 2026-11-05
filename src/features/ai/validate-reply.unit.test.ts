@@ -86,4 +86,37 @@ describe("parseReply", () => {
       expect(result.errors.join()).not.toContain("SECRET-RAW-OUTPUT");
     }
   });
+
+  it.each(["constructor", "toString", "__proto__", "hasOwnProperty"])("[review] operation name %s from the prototype is not an operation", (name) => {
+    expect(parse(okReply([{ op: name }])).ok).toBe(false);
+  });
+
+  it("[review] an extra field called constructor is rejected", () => {
+    const raw = okReply([JSON.parse('{"op":"remove_item","line":1,"constructor":1}')]);
+
+    expect(parse(raw).ok).toBe(false);
+  });
+
+  it("[review] set with a __proto__ key and a top-level __proto__ key are rejected, not thrown", () => {
+    const setRaw = '{"status":"ok","reason":null,"action":null,"question":null,"reply":"x","operations":[{"op":"update_item","line":1,"set":{"__proto__":1}}]}';
+    const topRaw = okReply([addItem()]).replace("{", '{"__proto__":{"x":1},');
+
+    expect(parse(setRaw).ok).toBe(false);
+    expect(parse(topRaw).ok).toBe(false);
+  });
+
+  it("[review] error lines never repeat a key name from the model", () => {
+    const raw = okReply([JSON.parse('{"op":"remove_item","line":1,"' + "k".repeat(500) + '":1}')]);
+
+    const result = parse(raw);
+
+    expect(result.ok === false && result.errors.join().length).toBeLessThan(200);
+  });
+
+  it("[review] numbers above 1e9, general text above 500 and remarks above 500 are rejected", () => {
+    expect(parse(okReply([addItem({ unit_price: 1e10 })])).ok).toBe(false);
+    expect(parse(okReply([addItem({ unit: "ก".repeat(501) })])).ok).toBe(false);
+    expect(parse(okReply([{ op: "set_remarks", text: "ก".repeat(501) }])).ok).toBe(false);
+    expect(parse(okReply([{ op: "set_remarks", text: "ก".repeat(500) }])).ok).toBe(true);
+  });
 });

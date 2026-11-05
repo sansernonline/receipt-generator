@@ -21,8 +21,10 @@ export const OCR_INSTRUCTION = "Extract all text from this image as Markdown.";
 export const DEFAULT_IMAGE_REQUEST = "เพิ่มรายการจากข้อความที่อ่านจากรูป";
 
 // Text that looks like one of our data tags could close the block early and write instructions after it (PROMPT-LIBRARY 2.2)
-const FAKE_TAG = /<\/?\s*(ocr_text|draft|history|user_message|data)\s*>/gi;
-export const sanitize = (text: string) => text.replace(FAKE_TAG, "[แท็กถูกตัด]");
+const FAKE_TAG = /<\s*\/?\s*(ocr_text|draft|history|user_message|data)(?![A-Za-z0-9_])[^>]*>/gi;
+const INVISIBLE = /[\u200B-\u200D\u2060\uFEFF]/g;
+// Hidden characters and full-width brackets must not let a fake tag slip through
+export const sanitize = (text: string) => text.replace(INVISIBLE, "").replace(/＜/g, "<").replace(/＞/g, ">").replace(FAKE_TAG, "[แท็กถูกตัด]");
 
 const speaker = (turn: ChatTurn) => (turn.role === "user" ? "ผู้ใช้" : "ระบบ");
 const historyLine = (turn: ChatTurn) => `${speaker(turn)}: ${sanitize(turn.text)}`;

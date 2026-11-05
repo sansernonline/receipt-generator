@@ -7,12 +7,15 @@ export type ImageLimiter = { take: (count: number) => TakeResult };
 // simple: the counter lives in this process's memory, so the limit is exact for one server process
 // and a restart forgets it. Use a shared store if the app ever runs as several processes.
 /** Sliding window: a picture counts for 60 seconds after it was taken (the window rule is not confirmed in the SRS). */
-export function createImageLimiter(now: () => number = Date.now): ImageLimiter {
+// The default clock never goes back (performance.now); a clock that does is held at its latest value.
+// Rights are taken before OCR starts and are not given back when OCR fails (decided: simpler, and the call may have reached the service).
+export function createImageLimiter(now: () => number = () => performance.now()): ImageLimiter {
   let takenAt: number[] = []; // ascending; never longer than the limit
+  let latest = -Infinity;
 
   return {
     take(count) {
-      const t = now();
+      const t = (latest = Math.max(latest, now()));
       takenAt = takenAt.filter((at) => at > t - WINDOW_MS);
       const mustLeave = takenAt.length + count - IMAGE_LIMIT_PER_MINUTE;
       if (mustLeave > 0) {

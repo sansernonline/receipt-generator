@@ -19,4 +19,9 @@ describe("loadAiConfig", () => {
   it("ignores a token ceiling that is not a positive integer", () => {
     expect(loadAiConfig({ AI_MAX_TOKENS: "abc" }).maxTokens).toBe(8192);
   });
+
+  it("[review] allows 5 pieces of picture text per command unless AI_MAX_CHUNKS says otherwise", () => {
+    expect(loadAiConfig({}).maxChunks).toBe(5);
+    expect(loadAiConfig({ AI_MAX_CHUNKS: "2" }).maxChunks).toBe(2);
+  });
 });

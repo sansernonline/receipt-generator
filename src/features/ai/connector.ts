@@ -38,6 +38,7 @@ async function send(config: AiConfig, request: CompletionRequest, fetchFn: typeo
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${config.apiKey}` },
       body: JSON.stringify({ model: request.model, messages: request.messages, temperature: 0, max_tokens: request.maxTokens }),
+      redirect: "error", // the key must only go to the configured address
       signal: AbortSignal.timeout(config.timeoutMs),
     });
   } catch (error) {
