@@ -74,4 +74,61 @@ describe("applyOperations (closed set, all or nothing)", () => {
     expect(result.isApplied).toBe(false);
     expect(result.draft).toBe(before);
   });
+
+  const setBill = (fields: Record<string, unknown>) => applyOperations(draftWith(), [{ op: "set_bill_info", fields }]);
+  const dateOp = (d: number, m: number, y: number) => setBill({ doc_date: { d, m, y, era: "BE" } });
+
+  it("[TC-HDR-034] set_bill_info sets the customer and the bill number, other fields stay", () => {
+    const { draft } = setBill({ customer_name: "คุณสมชาย ใจดี", doc_no: "RC-0042" });
+
+    expect(draft.bill).toMatchObject({ customerName: "คุณสมชาย ใจดี", billNumber: "RC-0042", customerPhone: null });
+  });
+
+  it("[TC-HDR-056] phone and email are kept exactly as typed", () => {
+    const { draft } = setBill({ customer_phone: "081-234-5678", customer_email: "somchai@example.com" });
+
+    expect(draft.bill).toMatchObject({ customerPhone: "081-234-5678", customerEmail: "somchai@example.com" });
+  });
+
+  it("[TC-HDR-035] [TC-HDR-057] HTML in the name, email and phone is stored as raw text (the preview escaping waits for the bill preview row)", () => {
+    const html = { customer_name: "<img src=x onerror=alert(1)>", customer_email: '"><img src=x onerror=alert(1)>@example.com', customer_phone: "<b>081</b>" };
+
+    const { draft } = setBill(html);
+
+    expect([draft.bill.customerName, draft.bill.customerEmail, draft.bill.customerPhone]).toEqual(Object.values(html));
+  });
+
+  it.each([[31, 2, 2569], [29, 2, 2568]])("[TC-HDR-036] %i/%i/%i does not exist, the batch is refused", (d, m, y) => {
+    const result = dateOp(d, m, y);
+
+    expect(result.isApplied).toBe(false);
+    expect(result.draft.bill.billDate).toBeNull();
+  });
+
+  it("[TC-HDR-036] 29/2/2567 is a leap day (CE 2024) and is set", () => {
+    expect(dateOp(29, 2, 2567).draft.bill.billDate).toEqual({ d: 29, m: 2, y: 2567, era: "BE" });
+  });
+
+  it("an unknown bill field refuses the batch, even next to a good one", () => {
+    expect(setBill({ customer_name: "ก", shop_name: "ร้านปลอม" }).isApplied).toBe(false);
+  });
+
+  const badDay = { d: 31, m: 2, y: 2569, era: "BE" };
+
+  it("[TC-HDR-036] a bad doc_date next to a good field refuses the whole batch", () => {
+    const result = setBill({ customer_name: "คุณสมชาย", doc_date: badDay });
+
+    expect(result.isApplied).toBe(false);
+    expect(result.draft.bill.customerName).toBeNull();
+  });
+
+  it("[TC-HDR-036] a bad due_date is refused", () => {
+    expect(setBill({ due_date: badDay }).isApplied).toBe(false);
+  });
+
+  it("[TC-HDR-036] a bad set_payment date is refused", () => {
+    const result = applyOperations(draftWith(), [{ op: "set_payment", method: "cash", date: badDay }]);
+
+    expect(result.isApplied).toBe(false);
+  });
 });

@@ -1,5 +1,6 @@
 import type { Operation } from "@/features/ai/types";
 import type { Discount } from "@/features/totals/types";
+import { isRealDate } from "@/features/thai-date/thai-date";
 import { totalsOf } from "./draft-totals";
 import { NOTICE_BAD_VALUE, NOTICE_HEADER_BY_BUTTON, NOTICE_NOT_SUPPORTED, NOTICE_TOO_MANY_OPERATIONS, NOTICE_TOTAL_IS_COMPUTED } from "./notices";
 import { parseDate } from "./parse-draft";
@@ -21,7 +22,7 @@ const isTextOrNull = (v: unknown) => v === null || isText(v);
 const isNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= MAX_MONEY;
 const isPositive = (v: unknown) => isNumber(v) && v > 0;
 const isNotNegative = (v: unknown) => isNumber(v) && v >= 0;
-const isDateOrNull = (v: unknown) => v === null || parseDate(v) !== null;
+const isRealDateOrNull = (v: unknown) => v === null || ((date) => date !== null && isRealDate(date))(parseDate(v));
 
 type FieldRule<T> = { key: keyof T; isValid: (v: unknown) => boolean };
 // AI field name -> where it goes in the draft and what a usable value looks like
@@ -45,9 +46,9 @@ const BILL_FIELDS: Record<string, FieldRule<BillInfo>> = {
   customer_phone: { key: "customerPhone", isValid: isTextOrNull },
   customer_email: { key: "customerEmail", isValid: isTextOrNull },
   doc_no: { key: "billNumber", isValid: isTextOrNull },
-  doc_date: { key: "billDate", isValid: isDateOrNull },
+  doc_date: { key: "billDate", isValid: isRealDateOrNull },
   ref: { key: "ref", isValid: isTextOrNull },
-  due_date: { key: "dueDate", isValid: isDateOrNull },
+  due_date: { key: "dueDate", isValid: isRealDateOrNull },
   quote_ref: { key: "quoteRef", isValid: isTextOrNull },
   quoted_by: { key: "quotedBy", isValid: isTextOrNull },
 };
@@ -125,7 +126,7 @@ const handlers: Record<string, Handler> = {
     return withFooter(draft, { vat: { ...draft.footer.vat, mode: VAT_MODES[op.mode as keyof typeof VAT_MODES] } });
   },
   set_payment(draft, op) {
-    if (!PAYMENT_METHODS.includes(op.method as string | null) || !isDateOrNull(op.date)) return null;
+    if (!PAYMENT_METHODS.includes(op.method as string | null) || !isRealDateOrNull(op.date)) return null;
     return withFooter(draft, { paymentMethod: op.method as PaymentMethod | null, paymentDate: op.date === null ? null : parseDate(op.date) });
   },
   set_payment_detail(draft, op) {
