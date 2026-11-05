@@ -16,14 +16,14 @@ import { type ShopReply, type ShopReplyHeader, parseShopReply } from "./validate
 
 const PROMPT_ID = "P-002";
 const PROMPT_VERSION = "0.3";
-const OUTPUT_TOKENS = 1024; // PROMPT-LIBRARY P-002 (รอยืนยัน)
+const OUTPUT_TOKENS = 1024; // PROMPT-LIBRARY P-001 and P-002 (รอยืนยัน)
 
 export type AskShopInput = { chatId: string; userText: string; chatHistory?: ChatTurn[] };
 
 /** card = what the user may review; null = the message holds no shop info. hasBillContent = the message also has a customer or items. The chat is never touched here (FR-HDR-100). */
 export type AskShopResult = { ok: true; card: ShopFields | null; hasBillContent: boolean } | Failure;
 
-const TEMPLATE_OF = { cash_bill: "cash", receipt: "receipt", tax_invoice_receipt: "taxinv", invoice: "invoice" } as const;
+export const TEMPLATE_OF = { cash_bill: "cash", receipt: "receipt", tax_invoice_receipt: "taxinv", invoice: "invoice" } as const;
 
 function toCard(header: ShopReplyHeader): ShopFields | null {
   const { shop_name, address, tax_id, phone, email, doc_type } = header;
@@ -40,25 +40,28 @@ async function run(input: AskShopInput, ctx: Ctx): Promise<AskShopResult> {
   const history = fitHistory(input.chatHistory ?? [], inputBudgetChars(ctx.config, system.length + input.userText.length));
   const user = buildShopMessage(history, input.userText);
 
-  const reply = await readShop(input.chatId, ctx, system, user);
+  const reply = await readShopReply(input.chatId, ctx, SHOP_PROMPT, system, user);
   if (!reply) return failed("invalid_reply", MESSAGE_INVALID_REPLY);
   if (reply.status === "refuse") return failed("refused", refusalMessage(reply.reason, null));
   return { ok: true, card: reply.header && toCard(reply.header), hasBillContent: reply.has_bill_content };
 }
 
-/** First try, then one retry with the problems listed (FR-AI-020). null = both tries failed the check. */
-async function readShop(chatId: string, ctx: Ctx, system: string, user: string): Promise<ShopReply | null> {
-  const first = await attempt(chatId, ctx, system, user);
+type Prompt<T> = { id: string; version: string; parse: (raw: string) => { ok: true; value: T } | { ok: false; errors: string[] } };
+const SHOP_PROMPT: Prompt<ShopReply> = { id: PROMPT_ID, version: PROMPT_VERSION, parse: parseShopReply };
+
+/** First try, then one retry with the problems listed (FR-AI-020). null = both tries failed the check. Shared with the picture reader (P-001). */
+export async function readShopReply<T>(chatId: string, ctx: Ctx, prompt: Prompt<T>, system: string, user: string): Promise<T | null> {
+  const first = await attempt(chatId, ctx, prompt, system, user);
   if (first.ok) return first.value;
-  const second = await attempt(chatId, ctx, system, buildRetryMessage(user, first.errors));
+  const second = await attempt(chatId, ctx, prompt, system, buildRetryMessage(user, first.errors));
   return second.ok ? second.value : null;
 }
 
-async function attempt(chatId: string, ctx: Ctx, system: string, user: string) {
+async function attempt<T>(chatId: string, ctx: Ctx, prompt: Prompt<T>, system: string, user: string) {
   const model = ctx.config.modelText;
-  const meta = { chatId, promptId: PROMPT_ID, promptVersion: PROMPT_VERSION, model };
+  const meta = { chatId, promptId: prompt.id, promptVersion: prompt.version, model };
   const messages = [{ role: "system" as const, content: system }, { role: "user" as const, content: user }];
-  const parsed = await logged(ctx, meta, async () => parseShopReply(await complete(ctx.config, { model, maxTokens: OUTPUT_TOKENS, messages }, ctx.fetch)), (result) => (result.ok ? "ok" : "schema_fail"));
+  const parsed = await logged(ctx, meta, async () => prompt.parse(await complete(ctx.config, { model, maxTokens: OUTPUT_TOKENS, messages }, ctx.fetch)), (result) => (result.ok ? "ok" : "schema_fail"));
   if (parsed.ok && hasLeak(parsed.value, { canary: ctx.canary, apiKey: ctx.config.apiKey })) {
     logLeak(ctx, chatId);
     throw new LeakDetected();

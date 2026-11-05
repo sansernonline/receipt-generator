@@ -17,7 +17,7 @@ import { parseReply, type Reply } from "./validate-reply";
 export type Ctx = AskAiDeps & LogContext & { canary: string };
 export type Failure = Extract<AskAiResult, { ok: false }>;
 
-const MAX_OCR_CHARS = 20_000; // per picture: a longer text is cut, so the number of AI calls stays bounded
+export const MAX_OCR_CHARS = 20_000; // per picture: a longer text is cut, so the number of AI calls stays bounded
 const MIN_CHUNK_CHARS = 500; // never split picture text into pieces smaller than this
 
 const defaultLog = (entry: AiLogEntry) => console.info("[ai]", JSON.stringify(entry));
@@ -48,7 +48,7 @@ export const askAi = (input: AskAiInput, deps: AskAiDeps): Promise<AskAiResult> 
 async function run(input: AskAiInput, ctx: Ctx): Promise<AskAiResult> {
   // The chat route checks this too; kept here so no caller can reach the AI with a longer text (FR-AI-080)
   if (countChars(input.userText) > MAX_MESSAGE_CHARS) return failed("message_too_long", MESSAGE_TOO_LONG);
-  const refusedImages = checkImageLimit(input, ctx);
+  const refusedImages = takeImageRights(input.images?.length ?? 0, ctx);
   if (refusedImages) return refusedImages;
 
   const system = buildSystem(ctx.canary);
@@ -66,8 +66,7 @@ async function run(input: AskAiInput, ctx: Ctx): Promise<AskAiResult> {
 }
 
 /** Counts the pictures of this message against the per-minute limit before any OCR call (FR-AI-090 · 120). */
-function checkImageLimit(input: AskAiInput, deps: Ctx): Failure | null {
-  const count = input.images?.length ?? 0;
+export function takeImageRights(count: number, deps: Ctx): Failure | null {
   if (count === 0) return null;
   if (count > IMAGE_LIMIT_PER_MINUTE) return failed("rate_limited", MESSAGE_TOO_MANY_IMAGES);
   const taken = (deps.imageLimiter ?? sharedImageLimiter).take(count);

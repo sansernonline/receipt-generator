@@ -7,3 +7,6 @@ export const MESSAGE_TOO_MANY_IMAGES = "ส่งรูปได้ครั้�
 export const messageWaitForImages = (seconds: number) => `อ่านรูปได้ไม่เกิน 20 รูปต่อนาที กรุณารอ ${seconds} วินาทีแล้วส่งใหม่`; // FR-AI-120
 export const MESSAGE_TOO_LONG_INPUT = "ข้อมูลที่ส่งยาวเกินไปที่จะอ่านครั้งเดียว ลองส่งทีละน้อย";
 export const MESSAGE_PARTIAL_OCR = "(อ่านจากรูปได้บางส่วน เพราะข้อความในรูปยาวเกินไป)";
+// P-001 rows "empty" and "unsupported_doc" (PROMPT-LIBRARY ข้อ 3); wording still รอยืนยัน
+export const MESSAGE_NO_SHOP_IN_IMAGE = "ไม่พบข้อมูลร้านในรูปนี้ ลองส่งรูปบิลที่เห็นหัวร้านชัด ๆ หรือพิมพ์ข้อมูลร้านในแชตแทน";
+export const MESSAGE_UNSUPPORTED_DOC = "เอกสารในรูปไม่ตรงกับแม่แบบที่มี BILLGEN ออกได้ 4 แบบ คือ บิลเงินสด · ใบเสร็จรับเงิน · ใบกำกับภาษี/ใบเสร็จรับเงิน · ใบแจ้งหนี้ ส่งรูปบิลแบบใดแบบหนึ่งนี้ หรือพิมพ์ข้อมูลร้านในแชตแทน";

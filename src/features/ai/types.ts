@@ -46,7 +46,7 @@ export type AskAiDeps = {
   imageLimiter?: ImageLimiter;
 };
 
-export type AskAiFailure = "message_too_long" | "rate_limited" | "ai_unreachable" | "invalid_reply" | "refused" | "leak" | "too_long_input";
+export type AskAiFailure = "message_too_long" | "rate_limited" | "ai_unreachable" | "invalid_reply" | "refused" | "leak" | "too_long_input" | "no_shop_in_image" | "unsupported_doc";
 
 /** ok:true = operations may be applied (empty + reply = a question for the user). ok:false = draft stays as it is. */
 export type AskAiResult =

@@ -1,4 +1,4 @@
-import type { ShopFields, ShopHeader } from "@/features/shop-header/types";
+import type { ShopHeader, ShopProposal } from "@/features/shop-header/types";
 import type { BillTotals, Discount, VatSetting } from "@/features/totals/types";
 
 // Shape of chats/<id>/draft.json (SRS 6.2). The server owns it (ADR-0006); money is in baht with 2 decimals,
@@ -64,7 +64,7 @@ export type SendMessageResponse = {
   draft: Draft;
   totals: BillTotals;
   shop: ShopHeader | null;
-  shopCard?: ShopFields;
+  shopCard?: ShopProposal;
   shopCardHasBill?: true;
   notices: string[];
   canUndo: boolean;

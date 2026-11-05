@@ -5,17 +5,12 @@ import type { SendMessageResponse } from "@/features/draft/types";
 export const AI_WAIT_LIMIT_MS = 65_000;
 export class AiWaitTimeout extends Error {}
 
-/** Posts one message and gives up after the wait limit so the box can never stay closed for good. */
-export async function postMessage(chatId: string, text: string): Promise<SendMessageResponse> {
+/** Posts one request that waits for the AI and gives up after the wait limit so the box can never stay closed for good. */
+async function postAndWait(url: string, init: RequestInit): Promise<SendMessageResponse> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), AI_WAIT_LIMIT_MS);
   try {
-    const res = await fetch(`/api/chats/${chatId}/messages`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text }),
-      signal: controller.signal,
-    });
+    const res = await fetch(url, { method: "POST", ...init, signal: controller.signal });
     if (!res.ok) throw new Error("send failed");
     return await res.json();
   } catch (error) {
@@ -23,4 +18,14 @@ export async function postMessage(chatId: string, text: string): Promise<SendMes
   } finally {
     clearTimeout(timer);
   }
+}
+
+export const postMessage = (chatId: string, text: string) =>
+  postAndWait(`/api/chats/${chatId}/messages`, { headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
+
+/** The sample bill picture. The browser sets the form's content type itself. */
+export function postPicture(chatId: string, file: File) {
+  const form = new FormData();
+  form.set("image", file);
+  return postAndWait(`/api/chats/${chatId}/shop-image`, { body: form });
 }

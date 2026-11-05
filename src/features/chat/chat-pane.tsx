@@ -1,4 +1,4 @@
-import { useEffect, useRef, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, type ChangeEvent, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { MessageBubble } from "./message-bubble";
 import { chipsFor, type ChatStage } from "./quick-chips";
 
@@ -20,11 +20,14 @@ type Props = {
   onTextChange: (text: string) => void;
   onFillText: (text: string) => void;
   onSend: () => void;
+  canAttach: boolean; // a sample bill picture is for the shop header, so only a chat with no shop header takes one
+  onAttach: (file: File) => void;
   isHiddenOnMobile?: boolean;
 };
 
-export function ChatPane({ title, messages, text, stage, isBusy, isSending, sendError, openError, menuRef, actions, card, onOpenDrawer, onTextChange, onFillText, onSend, isHiddenOnMobile = false }: Props) {
+export function ChatPane({ title, messages, text, stage, isBusy, isSending, sendError, openError, menuRef, actions, card, onOpenDrawer, onTextChange, onFillText, onSend, canAttach, onAttach, isHiddenOnMobile = false }: Props) {
   const boxRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   function fillBox(fillText: string) {
     onFillText(fillText);
@@ -45,6 +48,12 @@ export function ChatPane({ title, messages, text, stage, isBusy, isSending, send
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
     if (canSend) onSend();
+  }
+
+  function pickFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // the same file can be chosen again
+    if (file) onAttach(file);
   }
 
   function submit(event: FormEvent) {
@@ -108,6 +117,12 @@ export function ChatPane({ title, messages, text, stage, isBusy, isSending, send
           </p>
         )}
         <form onSubmit={submit} className="flex items-end gap-2 rounded-[22px] border border-line-2 p-2">
+          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" aria-label="เลือกไฟล์รูป" hidden onChange={pickFile} />
+          <button type="button" disabled={!canAttach} aria-label="แนบรูป" title={canAttach ? "แนบรูปบิลตัวอย่าง" : "แนบรูปรายการสินค้า เร็วๆ นี้"} onClick={() => fileRef.current?.click()} className="grid size-9 shrink-0 place-items-center rounded-full hover:bg-surface-2 disabled:opacity-40">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 11.5l-8.6 8.6a5.5 5.5 0 01-7.8-7.8l9.2-9.2a3.7 3.7 0 015.2 5.2l-9.2 9.2a1.8 1.8 0 01-2.6-2.6l8.5-8.5" />
+            </svg>
+          </button>
           <textarea
             ref={boxRef}
             aria-label="ข้อความ"

@@ -1,0 +1,93 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { BillPreview } from "@/features/bill/bill-preview";
+import type { BillData } from "@/features/bill/types";
+import { totalsOf } from "@/features/draft/draft-totals";
+import { emptyDraft } from "@/features/draft/parse-draft";
+import { ShopCard } from "./shop-card";
+import { cashShop } from "./test-kit";
+import type { ShopProposal } from "./types";
+
+const A = "11111111-1111-4111-8111-111111111111";
+let posted: Record<string, unknown>[];
+
+// a fake server: it echoes the shop it is asked to save, like the real one
+beforeEach(() => {
+  posted = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      posted.push(body);
+      return Response.json({ draft: emptyDraft(), totals: totalsOf(emptyDraft()), shop: { id: A, ...body } }, { status: 201 });
+    }),
+  );
+});
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+// the card and the bill side by side, as in the chat
+function Harness({ card, sample }: { card: ShopProposal; sample?: string }) {
+  const [bill, setBill] = useState<BillData | null>(null);
+  return (
+    <>
+      <ShopCard card={card} hasFollowUp={false} chatId={A} sample={sample} onUsed={setBill} />
+      <BillPreview bill={bill} />
+    </>
+  );
+}
+
+const use = () => fireEvent.click(screen.getByRole("button", { name: "ใช้หัวบิลนี้" }));
+const sent = async () => {
+  await waitFor(() => expect(posted).toHaveLength(1));
+  return posted[0];
+};
+
+test("[FR-HDR-050] a card from a picture shows the sample picture to cut the logo from; a card from text does not", () => {
+  const { unmount } = render(<Harness card={cashShop} sample="blob:sample" />);
+  expect(screen.getByRole("img", { name: "รูปบิลตัวอย่าง" })).toHaveAttribute("src", "blob:sample");
+  unmount();
+
+  render(<Harness card={cashShop} />);
+
+  expect(screen.queryByRole("img", { name: "รูปบิลตัวอย่าง" })).toBeNull();
+});
+
+test("[FR-TOT-040] the tax mode the AI chose is selected, and the user's choice is what is sent", async () => {
+  render(<Harness card={{ ...cashShop, vatMode: "exclusive" }} sample="blob:sample" />);
+  const select = screen.getByRole("combobox", { name: "วิธีคิดภาษีเริ่มต้น" });
+  expect(select).toHaveValue("exclusive");
+
+  fireEvent.change(select, { target: { value: "inclusive" } });
+  use();
+
+  expect(await sent()).toMatchObject({ vatMode: "inclusive" });
+});
+
+test("[TC-TOT-017] a card with no tax mode (from typed text) starts on none", async () => {
+  render(<Harness card={cashShop} />);
+
+  expect(screen.getByRole("combobox", { name: "วิธีคิดภาษีเริ่มต้น" })).toHaveValue("none");
+  use();
+
+  expect(await sent()).toMatchObject({ vatMode: "none" });
+});
+
+test("[FR-HDR-070] a field the AI was unsure about is marked for checking; the others are not", () => {
+  render(<Harness card={{ ...cashShop, uncertain: ["taxId", "template"] }} sample="blob:sample" />);
+
+  expect(screen.getByLabelText(/เลขประจำตัวผู้เสียภาษี/)).toHaveAccessibleDescription("AI ไม่แน่ใจช่องนี้ ตรวจกับรูปอีกครั้ง");
+  expect(screen.getByRole("combobox", { name: /แม่แบบ/ })).toHaveAccessibleDescription("AI ไม่แน่ใจช่องนี้ ตรวจกับรูปอีกครั้ง");
+  expect(screen.getByLabelText("ชื่อร้าน")).not.toHaveAccessibleDescription();
+});
+
+test("[FR-HDR-070] the uncertain hint is not sent back to the server", async () => {
+  render(<Harness card={{ ...cashShop, uncertain: ["taxId"] }} sample="blob:sample" />);
+
+  use();
+
+  expect(await sent()).not.toHaveProperty("uncertain");
+});

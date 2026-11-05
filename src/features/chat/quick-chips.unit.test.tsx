@@ -14,7 +14,7 @@ const STAGES: ChatStage[] = ["no-shop", "no-items", "has-items"];
 const FIRST_STAGE_CHIP = "ส่งรูปบิลตัวอย่าง";
 
 function renderPane(stage: ChatStage, onFillText = vi.fn()) {
-  render(<ChatPane title="แชตใหม่" messages={[]} text="" stage={stage} isBusy={false} isSending={false} sendError={null} openError={null} menuRef={createRef()} onOpenDrawer={() => undefined} onTextChange={() => undefined} onFillText={onFillText} onSend={() => undefined} />);
+  render(<ChatPane title="แชตใหม่" messages={[]} text="" stage={stage} isBusy={false} isSending={false} sendError={null} openError={null} menuRef={createRef()} onOpenDrawer={() => undefined} onTextChange={() => undefined} onFillText={onFillText} onSend={() => undefined} canAttach={false} onAttach={() => undefined} />);
   return within(screen.getByRole("group", { name: "คำสั่งด่วน" }));
 }
 const chipLabels = (stage: ChatStage) => {

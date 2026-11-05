@@ -22,11 +22,11 @@ export type ShopReply = {
 
 export type ShopParseResult = { ok: true; value: ShopReply } | { ok: false; errors: string[] };
 
-const MAX_NOTE = 200;
-const HEADER_NAMES = ["doc_type", "title_th", "title_en", "shop_name", "address", "tax_id", "branch", "phone", "email", "vat_mode"];
+export const MAX_NOTE = 200;
+export const HEADER_NAMES = ["doc_type", "title_th", "title_en", "shop_name", "address", "tax_id", "branch", "phone", "email", "vat_mode"];
 
-const taxId: Check = (v) => (typeof v === "string" && /^[0-9]{1,13}$/.test(v) ? null : "ต้องเป็นตัวเลข 1-13 หลัก");
-const branch: Check = (v) => {
+export const taxId: Check = (v) => (typeof v === "string" && /^[0-9]{1,13}$/.test(v) ? null : "ต้องเป็นตัวเลข 1-13 หลัก");
+export const branch: Check = (v) => {
   const problem = object(v, { type: oneOf("head_office", "branch"), no: orNull(text()) });
   return problem ?? ((v as { type: string; no: unknown }).type === "head_office" && (v as { no: unknown }).no !== null ? "สำนักงานใหญ่ไม่มีเลขสาขา" : null);
 };
@@ -38,15 +38,15 @@ const headerFields: Fields = {
   doc_no_sample: oneOf(null), vat_mode: oneOf("none", "included", "excluded", null),
 };
 
-const uncertain: Check = (v) =>
-  Array.isArray(v) && v.every((name) => HEADER_NAMES.includes(name)) && new Set(v).size === v.length ? null : "uncertain: ชื่อช่องไม่ถูกต้อง";
+export const uncertainIn = (names: string[]): Check => (v) =>
+  Array.isArray(v) && v.every((name) => names.includes(name)) && new Set(v).size === v.length ? null : "uncertain: ชื่อช่องไม่ถูกต้อง";
 
 const replyFields: Fields = {
   status: oneOf("ok", "empty", "refuse"),
   reason: oneOf(null, "out_of_scope", "internal_info"),
   header: orNull((v) => object(v, headerFields)),
   has_bill_content: (v) => (typeof v === "boolean" ? null : "ต้องเป็น true หรือ false"),
-  uncertain,
+  uncertain: uncertainIn(HEADER_NAMES),
   note: orNull(text(MAX_NOTE)),
 };
 

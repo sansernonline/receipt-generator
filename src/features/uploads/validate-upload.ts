@@ -9,6 +9,8 @@ const MESSAGES = {
   WRONG_TYPE: "รับเฉพาะ JPG PNG WEBP",
 } as const;
 
+export const TOO_LARGE_MESSAGE = MESSAGES.TOO_LARGE;
+
 export type UploadError = { ok: false; code: keyof typeof MESSAGES; message: string };
 export type UploadCheck = { ok: true; type: ImageType } | UploadError;
 

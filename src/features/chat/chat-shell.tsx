@@ -8,11 +8,13 @@ import { acknowledgeAiNotice, hasAcknowledgedAiNotice } from "../consent/ai-noti
 import { BillPreview } from "../bill/bill-preview";
 import { fetchBill, parseBill } from "../bill/fetch-bill";
 import type { BillData } from "../bill/types";
+import type { SendMessageResponse } from "../draft/types";
 import { ShopCard } from "../shop-header/shop-card";
-import type { ShopFields } from "../shop-header/types";
+import type { ShopProposal } from "../shop-header/types";
+import { attachProblem } from "../uploads/attach-problem";
 import { ChatPane, type ChatMessage } from "./chat-pane";
 import type { ChatListItem } from "./group-chats";
-import { AiWaitTimeout, postMessage } from "./post-message";
+import { AiWaitTimeout, postMessage, postPicture } from "./post-message";
 import { stageOf, type ChatStage } from "./quick-chips";
 
 const SEND_FAILED = "ส่งข้อความไม่สำเร็จ ลองอีกครั้ง";
@@ -21,6 +23,7 @@ const AI_TIMED_OUT = "ยังไม่ได้รับคำตอบจา�
 const CONSENT_SAVE_LIMIT_MS = 10_000; // a hung request must not keep the notice locked: cancel and accept are off while saving
 const NOTICE_SAVE_FAILED = "บันทึกการรับทราบไม่สำเร็จ ลองอีกครั้ง";
 const UNDO_FAILED = "ย้อนกลับไม่สำเร็จ ลองอีกครั้ง";
+const PICTURE_SENT = "ส่งรูปบิลตัวอย่าง"; // what the server stores for the turn (send-shop-image.ts)
 const SHOP_USED = "ใช้หัวบิลนี้แล้ว พิมพ์รายการสินค้าต่อได้เลย";
 
 export function ChatShell() {
@@ -40,12 +43,13 @@ export function ChatShell() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [bill, setBill] = useState<BillData | null>(null);
   // the AI proposal waiting for the user, with the typed text to send again after the shop is set (when it held items too); not stored, so both are gone when the chat is closed
-  const [shopCard, setShopCard] = useState<{ fields: ShopFields; followUp: string | null; ticket: number } | null>(null); // ticket = which open chat the card belongs to
+  const [shopCard, setShopCard] = useState<{ fields: ShopProposal; followUp: string | null; ticket: number; sample?: string } | null>(null); // ticket = which open chat the card belongs to; sample = object URL of the picture the card was read from
   const [hasBillError, setHasBillError] = useState(false);
   const [isBillTab, setIsBillTab] = useState(false); // phone only: one of chat / bill fills the screen
   const newChatRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
   const wasDrawerOpen = useRef(false);
+  const pendingPicture = useRef<File | null>(null); // held back until the user has seen the AI notice
   const latestOpen = useRef(0); // only the last chat the user clicked may fill the screen
   const [isBusy, setIsBusy] = useState(true); // true while loading the list, so a late list cannot overwrite a new chat
 
@@ -70,6 +74,10 @@ export function ChatShell() {
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [isDrawerOpen]);
+
+  // the picture's object URL is let go when the card is replaced or closed
+  const sample = shopCard?.sample;
+  useEffect(() => () => (sample ? URL.revokeObjectURL(sample) : undefined), [sample]);
 
   // a late list response can already contain the chat, so never add the same id twice
   const putOnTop = (chat: ChatListItem) => setChats((current) => [chat, ...current.filter((item) => item.id !== chat.id)]);
@@ -153,6 +161,15 @@ export function ChatShell() {
     setStage(undone.draft.items.length ? "has-items" : "no-items");
   }
 
+  // the server's answer to a message or a picture; a new card replaces the old one, an answer with no shop info keeps it
+  function showAnswer(answer: SendMessageResponse, shown: ChatMessage[], ticket: number, sentText: string | null, sample?: string) {
+    putOnTop(answer.chat); // the reply is stored on the server; opening that chat again shows it
+    if (ticket !== latestOpen.current) return;
+    setMessages([...shown, ...answer.messages, ...answer.notices.map((notice) => ({ role: "notice", text: notice }))]);
+    setBill((current) => parseBill(answer) ?? current);
+    setShopCard((current) => (answer.shop ? null : answer.shopCard ? { fields: answer.shopCard, followUp: answer.shopCardHasBill ? sentText : null, ticket, sample } : current));
+  }
+
   // the box is cleared and the user's bubble shows at once; if sending fails both are put back
   async function sendMessage(again?: string) {
     const sentText = again ?? text;
@@ -167,12 +184,7 @@ export function ChatShell() {
       ticket = latestOpen.current;
       setMessages([...shown, { role: "user", text: sentText }]);
       if (again === undefined) setText(""); // a text sent again by itself must not wipe what the user has started to type
-      const answer = await postMessage(chatId, sentText);
-      putOnTop(answer.chat); // the reply is stored on the server; opening that chat again shows it
-      if (ticket !== latestOpen.current) return;
-      setMessages([...shown, ...answer.messages, ...answer.notices.map((notice) => ({ role: "notice", text: notice }))]);
-      setBill((current) => parseBill(answer) ?? current);
-      setShopCard((current) => (answer.shop ? null : answer.shopCard ? { fields: answer.shopCard, followUp: answer.shopCardHasBill ? sentText : null, ticket } : current)); // a new proposal replaces the old one; a message with no shop info keeps it
+      showAnswer(await postMessage(chatId, sentText), shown, ticket, sentText);
     } catch (error) {
       if (ticket !== latestOpen.current) return; // the user is on another chat now; its screen is not ours to change
       setMessages(shown);
@@ -182,6 +194,39 @@ export function ChatShell() {
       setIsSending(false);
       setIsBusy(false);
     }
+  }
+
+  // a sample bill picture: the server reads the header (FR-HDR-020); on failure the bubble is taken back
+  async function sendPicture(file: File) {
+    const shown = activeId ? messages : [];
+    setIsBusy(true);
+    setIsSending(true);
+    setSendError(null);
+    let ticket = latestOpen.current;
+    try {
+      const chatId = activeId ?? (await createChat());
+      if (chatId === null) return;
+      ticket = latestOpen.current;
+      setMessages([...shown, { role: "user", text: PICTURE_SENT }]);
+      const answer = await postPicture(chatId, file);
+      showAnswer(answer, shown, ticket, null, answer.shopCard ? URL.createObjectURL(file) : undefined);
+    } catch (error) {
+      if (ticket !== latestOpen.current) return;
+      setMessages(shown);
+      setSendError(error instanceof AiWaitTimeout ? AI_TIMED_OUT : SEND_FAILED);
+    } finally {
+      setIsSending(false);
+      setIsBusy(false);
+    }
+  }
+
+  async function attachPicture(file: File) {
+    const problem = await attachProblem(file);
+    if (problem) return setMessages((current) => [...current, { role: "notice", text: problem }]);
+    if (hasAcknowledgedAiNotice()) return void sendPicture(file);
+    pendingPicture.current = file;
+    setNoticeError(null);
+    setIsNoticeOpen(true);
   }
 
   function showShopUsed(shopBill: BillData, followUp: string | null, ticket: number) {
@@ -202,6 +247,12 @@ export function ChatShell() {
     }
   }
 
+  function closeNotice() {
+    if (isNoticeSaving) return;
+    pendingPicture.current = null;
+    setIsNoticeOpen(false);
+  }
+
   async function acceptNotice() {
     setIsNoticeSaving(true);
     setNoticeError(null);
@@ -219,7 +270,9 @@ export function ChatShell() {
     }
     acknowledgeAiNotice();
     setIsNoticeOpen(false);
-    void sendMessage();
+    const picture = pendingPicture.current;
+    pendingPicture.current = null;
+    void (picture ? sendPicture(picture) : sendMessage());
   }
 
   const active = chats.find((chat) => chat.id === activeId);
@@ -228,8 +281,8 @@ export function ChatShell() {
     <div className="h-screen bg-desk p-0 lg:p-2.5">
       <div className="relative grid h-full overflow-hidden bg-white max-lg:grid-cols-[minmax(0,1fr)] max-lg:grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[288px_minmax(440px,1.1fr)_minmax(360px,560px)] lg:rounded-2xl lg:border lg:border-line lg:shadow-sm">
         <ChatList chats={chats} activeId={activeId} now={new Date()} isBusy={isBusy} isDrawerOpen={isDrawerOpen} hasListError={hasListError} hasCreateError={hasCreateError} newChatRef={newChatRef} onNewChat={startNewChat} onOpen={openChat} />
-        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} isSending={isSending} sendError={sendError} openError={openError} menuRef={menuRef} actions={active && <ChatActions chat={active} isDisabled={isBusy} onRenamed={putOnTop} onDeleted={removeChat} />} card={shopCard && activeId && <ShopCard key={JSON.stringify(shopCard)} card={shopCard.fields} hasFollowUp={shopCard.followUp !== null} chatId={activeId} onUsed={(shopBill) => showShopUsed(shopBill, shopCard.followUp, shopCard.ticket)} />} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={requestSend} isHiddenOnMobile={isBillTab} />
-        {isNoticeOpen && <AiNoticeDialog isSaving={isNoticeSaving} error={noticeError} onAccept={acceptNotice} onClose={() => !isNoticeSaving && setIsNoticeOpen(false)} />}
+        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} isSending={isSending} sendError={sendError} openError={openError} menuRef={menuRef} actions={active && <ChatActions chat={active} isDisabled={isBusy} onRenamed={putOnTop} onDeleted={removeChat} />} card={shopCard && activeId && <ShopCard key={JSON.stringify(shopCard)} card={shopCard.fields} sample={shopCard.sample} hasFollowUp={shopCard.followUp !== null} chatId={activeId} onUsed={(shopBill) => showShopUsed(shopBill, shopCard.followUp, shopCard.ticket)} />} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={requestSend} canAttach={stage === "no-shop" && !isBusy} onAttach={(file) => void attachPicture(file)} isHiddenOnMobile={isBillTab} />
+        {isNoticeOpen && <AiNoticeDialog isSaving={isNoticeSaving} error={noticeError} onAccept={acceptNotice} onClose={closeNotice} />}
         {isDrawerOpen && <button type="button" aria-label="ปิดประวัติแชต" onClick={() => setIsDrawerOpen(false)} className="absolute inset-0 z-40 bg-black/40 lg:hidden" />}
         <BillPreview bill={bill} hasError={hasBillError} isUndoBlocked={isBusy} onUndo={() => void undoEdit()} className={isBillTab ? "" : "max-lg:hidden"} />
         <nav aria-label="สลับมุมมอง" className="grid grid-cols-2 border-t border-line bg-white lg:hidden">

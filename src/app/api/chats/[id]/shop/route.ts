@@ -2,7 +2,8 @@ import { failure, storageFailure } from "@/features/chat/route-errors";
 import { isAllowedOrigin } from "@/features/chat/same-origin";
 import { openDraft } from "@/features/draft/open-draft";
 import { ShopLockedError, confirmShop } from "@/features/shop-header/shop-store";
-import { checkShop, hasErrors, parseShopFields } from "@/features/shop-header/validate-shop";
+import { parseShopRequest } from "@/features/shop-header/shop-request";
+import { checkShop, hasErrors } from "@/features/shop-header/validate-shop";
 import { isValidId } from "@/features/storage/ids";
 import { createStore } from "@/features/storage/store";
 
@@ -11,13 +12,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!isAllowedOrigin(request)) return failure("forbidden", 403);
   const { id } = await params;
   if (!isValidId(id)) return failure("รหัสแชตไม่ถูกต้อง", 400);
-  const fields = parseShopFields(await request.json().catch(() => null));
-  if (!fields) return failure("ข้อมูลหัวบิลไม่ถูกต้อง", 400);
+  const parsed = parseShopRequest(await request.json().catch(() => null));
+  if (!parsed.ok) return failure(parsed.error, 400);
+  const { fields, ...extras } = parsed.value;
   const problems = checkShop(fields);
   if (hasErrors(problems)) return Response.json({ error: "ตรวจช่องที่ขีดแดงก่อนใช้หัวบิล", fields: problems.errors }, { status: 400 });
   try {
     const store = createStore();
-    await confirmShop(store, id, fields);
+    await confirmShop(store, id, fields, extras);
     return Response.json(await openDraft(store, id), { status: 201 });
   } catch (error) {
     if (error instanceof ShopLockedError) return failure('แชตนี้มีหัวบิลแล้ว แก้ได้ที่ปุ่ม "แก้หัวบิล"', 409);
