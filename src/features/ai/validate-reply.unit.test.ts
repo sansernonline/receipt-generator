@@ -60,6 +60,12 @@ describe("parseReply", () => {
     expect(parse(refuse({ reason: "use_button", action: "undo" })).ok).toBe(true);
   });
 
+  it("[TC-AI-018] a refuse that carries operations is accepted with the operations thrown away", () => {
+    const raw = okReply([{ op: "remove_item", line: 1 }], { status: "refuse", reason: "out_of_scope", reply: null });
+
+    expect(parse(raw)).toMatchObject({ ok: true, value: { status: "refuse", operations: [] } });
+  });
+
   it("checks update_item, discounts, vat mode and dates", () => {
     expect(parse(okReply([{ op: "update_item", line: 1, set: { qty: 2 } }])).ok).toBe(true);
     expect(parse(okReply([{ op: "update_item", line: 1, set: {} }])).ok).toBe(false);

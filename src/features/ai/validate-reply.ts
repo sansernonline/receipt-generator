@@ -148,6 +148,8 @@ export function parseReply(raw: string, context: { lineCount: number }): ParseRe
   if (shape) return { ok: false, errors: [shape] };
 
   const value = json as Reply;
+  // A refusal never applies anything: operations riding along with it are dropped, not retried (TC-AI-018)
+  if (value.status === "refuse") value.operations = [];
   const errors = value.operations
     .map((op, i) => ({ i, problem: operationProblem(op, context.lineCount) }))
     .filter((e) => e.problem)

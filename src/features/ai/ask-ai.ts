@@ -2,7 +2,8 @@ import { LogContext, logLeak, logged } from "./call-log";
 import { OUTPUT_TOKENS, inputBudgetChars, splitForBudget } from "./chunk-text";
 import { AiCallError, complete, ocrPage } from "./connector";
 import { hasLeak } from "./leak";
-import { MESSAGE_AI_UNREACHABLE, MESSAGE_INTERNAL_INFO, MESSAGE_INVALID_REPLY, MESSAGE_REFUSED } from "./messages";
+import { refusalMessage } from "./refusals";
+import { MESSAGE_AI_UNREACHABLE, MESSAGE_INTERNAL_INFO, MESSAGE_INVALID_REPLY } from "./messages";
 import {
   DEFAULT_IMAGE_REQUEST, PROMPT_ID, PROMPT_VERSION, SERVER_CANARY,
   bangkokDate, buildRetryMessage, buildSystem, buildUserMessage, fitHistory,
@@ -33,7 +34,7 @@ export async function askAi(input: AskAiInput, deps: AskAiDeps): Promise<AskAiRe
     for (const user of await userMessagesFor(input, ctx, system)) {
       const reply = await readCommand(input, ctx, system, user);
       if (!reply) return failed("invalid_reply", MESSAGE_INVALID_REPLY);
-      if (reply.status === "refuse") return failed("refused", MESSAGE_REFUSED);
+      if (reply.status === "refuse") return failed("refused", refusalMessage(reply.reason, reply.action));
       replies.push(reply);
     }
     return joinReplies(replies);
