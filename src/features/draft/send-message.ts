@@ -18,7 +18,7 @@ type Turn = Pick<SendMessageResponse, "messages" | "notices"> & { draft: Draft }
 
 const files = (store: Store, chatId: string) => ({ chat: path.join(store.chatDir(chatId), "chat.json"), draft: path.join(store.chatDir(chatId), "draft.json") });
 
-async function readDraft(store: Store, chatId: string): Promise<Draft> {
+export async function readDraft(store: Store, chatId: string): Promise<Draft> {
   return parseDraft(await store.readJson<unknown>(files(store, chatId).draft));
 }
 

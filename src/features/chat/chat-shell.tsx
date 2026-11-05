@@ -5,6 +5,9 @@ import { AiNoticeDialog } from "./ai-notice-dialog";
 import { ChatActions } from "./chat-actions";
 import { ChatList } from "./chat-list";
 import { acknowledgeAiNotice, hasAcknowledgedAiNotice } from "../consent/ai-notice-flag";
+import { BillPreview } from "../bill/bill-preview";
+import { fetchBill, parseBill } from "../bill/fetch-bill";
+import type { BillData } from "../bill/types";
 import { ChatPane, type ChatMessage } from "./chat-pane";
 import type { ChatListItem } from "./group-chats";
 import { AiWaitTimeout, postMessage } from "./post-message";
@@ -31,6 +34,9 @@ export function ChatShell() {
   const [noticeError, setNoticeError] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [bill, setBill] = useState<BillData | null>(null);
+  const [hasBillError, setHasBillError] = useState(false);
+  const [isBillTab, setIsBillTab] = useState(false); // phone only: one of chat / bill fills the screen
   const newChatRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
   const wasDrawerOpen = useRef(false);
@@ -71,6 +77,8 @@ export function ChatShell() {
     setOpenError(null);
     setSendError(null);
     setIsSending(false); // the waiting status belongs to the chat the message was sent from
+    setBill(null);
+    setHasBillError(false);
     setIsDrawerOpen(false);
   }
 
@@ -100,6 +108,14 @@ export function ChatShell() {
     }
   }
 
+  function loadBill(id: string) {
+    const ticket = latestOpen.current;
+    fetchBill(id).then(
+      (loaded) => ticket === latestOpen.current && setBill(loaded),
+      () => ticket === latestOpen.current && setHasBillError(true),
+    );
+  }
+
   async function openChat(id: string) {
     const ticket = ++latestOpen.current;
     setIsDrawerOpen(false);
@@ -109,6 +125,7 @@ export function ChatShell() {
       if (ticket !== latestOpen.current) return;
       if (!res.ok) return setOpenError(typeof body?.error === "string" ? body.error : "เปิดแชตไม่ได้ ลองอีกครั้ง");
       showChat(id, body.chat.messages, stageOf(body.chat, body.draft));
+      loadBill(id);
     } catch {
       if (ticket === latestOpen.current) setOpenError("เปิดแชตไม่ได้ ลองอีกครั้ง");
     }
@@ -131,6 +148,7 @@ export function ChatShell() {
       putOnTop(answer.chat); // the reply is stored on the server; opening that chat again shows it
       if (ticket !== latestOpen.current) return;
       setMessages([...shown, ...answer.messages, ...answer.notices.map((notice) => ({ role: "notice", text: notice }))]);
+      setBill((current) => parseBill(answer) ?? current);
     } catch (error) {
       if (ticket !== latestOpen.current) return; // the user is on another chat now; its screen is not ours to change
       setMessages(shown);
@@ -175,14 +193,19 @@ export function ChatShell() {
 
   return (
     <div className="h-screen bg-desk p-0 lg:p-2.5">
-      <div className="relative grid h-full overflow-hidden bg-white lg:grid-cols-[288px_minmax(440px,1.1fr)_minmax(360px,560px)] lg:rounded-2xl lg:border lg:border-line lg:shadow-sm">
+      <div className="relative grid h-full overflow-hidden bg-white max-lg:grid-cols-[minmax(0,1fr)] max-lg:grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[288px_minmax(440px,1.1fr)_minmax(360px,560px)] lg:rounded-2xl lg:border lg:border-line lg:shadow-sm">
         <ChatList chats={chats} activeId={activeId} now={new Date()} isBusy={isBusy} isDrawerOpen={isDrawerOpen} hasListError={hasListError} hasCreateError={hasCreateError} newChatRef={newChatRef} onNewChat={startNewChat} onOpen={openChat} />
-        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} isSending={isSending} sendError={sendError} openError={openError} menuRef={menuRef} actions={active && <ChatActions chat={active} isDisabled={isBusy} onRenamed={putOnTop} onDeleted={removeChat} />} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={requestSend} />
+        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} isSending={isSending} sendError={sendError} openError={openError} menuRef={menuRef} actions={active && <ChatActions chat={active} isDisabled={isBusy} onRenamed={putOnTop} onDeleted={removeChat} />} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={requestSend} isHiddenOnMobile={isBillTab} />
         {isNoticeOpen && <AiNoticeDialog isSaving={isNoticeSaving} error={noticeError} onAccept={acceptNotice} onClose={() => !isNoticeSaving && setIsNoticeOpen(false)} />}
         {isDrawerOpen && <button type="button" aria-label="ปิดประวัติแชต" onClick={() => setIsDrawerOpen(false)} className="absolute inset-0 z-40 bg-black/40 lg:hidden" />}
-        <section aria-label="ตัวอย่างบิล" className="hidden items-center justify-center border-l border-line bg-desk text-sm text-ink-3 lg:flex">
-          ตัวอย่างบิลจะแสดงที่นี่
-        </section>
+        <BillPreview bill={bill} hasError={hasBillError} className={isBillTab ? "" : "max-lg:hidden"} />
+        <nav aria-label="สลับมุมมอง" className="grid grid-cols-2 border-t border-line bg-white lg:hidden">
+          {[{ label: "แชต", isBill: false }, { label: "บิล", isBill: true }].map(({ label, isBill }) => (
+            <button key={label} type="button" aria-pressed={isBillTab === isBill} onClick={() => setIsBillTab(isBill)} className="min-h-11 font-semibold text-ink-2 aria-pressed:text-ink aria-pressed:shadow-[inset_0_-2px_0_var(--color-ink)]">
+              {label}
+            </button>
+          ))}
+        </nav>
       </div>
     </div>
   );

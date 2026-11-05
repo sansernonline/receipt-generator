@@ -19,9 +19,10 @@ type Props = {
   onTextChange: (text: string) => void;
   onFillText: (text: string) => void;
   onSend: () => void;
+  isHiddenOnMobile?: boolean;
 };
 
-export function ChatPane({ title, messages, text, stage, isBusy, isSending, sendError, openError, menuRef, actions, onOpenDrawer, onTextChange, onFillText, onSend }: Props) {
+export function ChatPane({ title, messages, text, stage, isBusy, isSending, sendError, openError, menuRef, actions, onOpenDrawer, onTextChange, onFillText, onSend, isHiddenOnMobile = false }: Props) {
   const boxRef = useRef<HTMLTextAreaElement>(null);
 
   function fillBox(fillText: string) {
@@ -51,7 +52,7 @@ export function ChatPane({ title, messages, text, stage, isBusy, isSending, send
   }
 
   return (
-    <main className="flex min-h-0 flex-col bg-white">
+    <main className={`flex min-h-0 flex-col bg-white ${isHiddenOnMobile ? "max-lg:hidden" : ""}`}>
       <header className="flex h-[52px] items-center gap-2 px-4">
         <button ref={menuRef} type="button" onClick={onOpenDrawer} aria-label="เปิดประวัติแชต" className="-ml-2 grid size-9 place-items-center rounded-full hover:bg-surface-2 lg:hidden">
           <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current" strokeWidth="2" strokeLinecap="round">
