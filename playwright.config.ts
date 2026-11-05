@@ -18,7 +18,7 @@ export default defineConfig({
     command: `npx next dev -H 127.0.0.1 -p ${port}`,
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: false,
-    env: { BILLGEN_DATA_DIR: dataDir },
+    env: { BILLGEN_DATA_DIR: dataDir, NEXT_DIST_DIR: ".next-e2e" }, // own build folder, never shared with other dev servers
   },
   use: { baseURL: `http://127.0.0.1:${port}` },
   projects: [

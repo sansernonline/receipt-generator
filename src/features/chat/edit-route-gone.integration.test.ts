@@ -17,7 +17,11 @@ async function waitUntilUp() {
 }
 
 beforeAll(async () => {
-  server = spawn("npx", ["next", "dev", "-H", "127.0.0.1", "-p", String(port)], { shell: true, stdio: "ignore" });
+  server = spawn("npx", ["next", "dev", "-H", "127.0.0.1", "-p", String(port)], {
+    shell: true,
+    stdio: "ignore",
+    env: { ...process.env, NEXT_DIST_DIR: ".next-integration" }, // own build folder: another next dev may hold the lock of .next
+  });
   await waitUntilUp();
 }, 90_000);
 

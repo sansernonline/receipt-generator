@@ -59,7 +59,7 @@ if (checks.length === 0) fail(`feature "${feature}" has 0 checks`);
 const port = await freePort();
 const base = `http://127.0.0.1:${port}`;
 const startCmd = process.env.VERIFY_START_CMD ?? `npx next dev -H 127.0.0.1 -p ${port}`;
-const app = spawn(startCmd, { shell: true, stdio: "ignore", env: { ...process.env, PORT: String(port) } });
+const app = spawn(startCmd, { shell: true, stdio: "ignore", env: { ...process.env, PORT: String(port), NEXT_DIST_DIR: ".next-verify" } });
 let failures = 0;
 
 try {
