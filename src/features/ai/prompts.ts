@@ -58,3 +58,8 @@ export function buildUserMessage(parts: UserMessageParts): string {
 export function buildRetryMessage(userMessage: string, errors: string[]): string {
   return `${userMessage}\n${P006_RETRY.replace("{{validation_errors}}", errors.join("\n"))}`;
 }
+
+// P-002 reads only what the user typed: no draft, no pictures
+export function buildShopMessage(history: ChatTurn[], userText: string): string {
+  return ["<history>", ...history.map(historyLine), "</history>", "<user_message>", sanitize(userText), "</user_message>"].join("\n");
+}

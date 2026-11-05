@@ -15,6 +15,7 @@ type Props = {
   openError: string | null;
   menuRef: RefObject<HTMLButtonElement | null>;
   actions?: ReactNode;
+  card?: ReactNode; // the shop header card, shown after the messages
   onOpenDrawer: () => void;
   onTextChange: (text: string) => void;
   onFillText: (text: string) => void;
@@ -22,7 +23,7 @@ type Props = {
   isHiddenOnMobile?: boolean;
 };
 
-export function ChatPane({ title, messages, text, stage, isBusy, isSending, sendError, openError, menuRef, actions, onOpenDrawer, onTextChange, onFillText, onSend, isHiddenOnMobile = false }: Props) {
+export function ChatPane({ title, messages, text, stage, isBusy, isSending, sendError, openError, menuRef, actions, card, onOpenDrawer, onTextChange, onFillText, onSend, isHiddenOnMobile = false }: Props) {
   const boxRef = useRef<HTMLTextAreaElement>(null);
 
   function fillBox(fillText: string) {
@@ -72,6 +73,7 @@ export function ChatPane({ title, messages, text, stage, isBusy, isSending, send
         {messages.map((message, index) => (
           <MessageBubble key={index} message={message} />
         ))}
+        {card}
         <div role="status" className="self-start">
           {isSending && (
             <div className="flex items-center gap-2 py-1 text-ink-3">

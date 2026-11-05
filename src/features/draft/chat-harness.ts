@@ -5,13 +5,18 @@ import { afterEach, beforeEach } from "vitest";
 import { POST } from "@/app/api/chats/[id]/messages/route";
 import { KEY, useAiStub } from "@/features/ai/test-kit";
 import { createChat } from "@/features/chat/chats";
+import { confirmShop } from "@/features/shop-header/shop-store";
+import { cashShop } from "@/features/shop-header/test-kit";
 import { createStore } from "@/features/storage/store";
 import type { Draft, SendMessageResponse } from "./types";
 
 const headers = { host: "localhost:3000", origin: "http://localhost:3000", "content-type": "application/json" };
 
-/** A chat on disk that starts with `startDraft`, a fake AI service, and send() that posts a message to the real route. */
-export function useChatWithDraft(startDraft: () => Draft) {
+/**
+ * A chat on disk that starts with `startDraft`, a fake AI service, and send() that posts a message to the real route.
+ * The chat has a confirmed shop header unless `hasShop` is false: without one a message is read as shop info (FR-HDR-060).
+ */
+export function useChatWithDraft(startDraft: () => Draft, { hasShop = true } = {}) {
   const { state } = useAiStub();
   let dataDir: string;
   let chatId: string;
@@ -23,6 +28,7 @@ export function useChatWithDraft(startDraft: () => Draft) {
     const store = createStore(dataDir);
     chatId = (await createChat(store)).id;
     await store.writeJsonAtomic(draftPath(), startDraft());
+    if (hasShop) await confirmShop(store, chatId, cashShop);
   });
 
   afterEach(async () => {
@@ -35,5 +41,6 @@ export function useChatWithDraft(startDraft: () => Draft) {
     return (await POST(request, { params: Promise.resolve({ id: chatId }) })).json();
   }
   const readDraftFile = async () => JSON.parse(await fsp.readFile(draftPath(), "utf8")) as Draft;
-  return { stub: () => state.stub, send, readDraftFile };
+  const readChatFile = async () => JSON.parse(await fsp.readFile(path.join(dataDir, "chats", chatId, "chat.json"), "utf8"));
+  return { stub: () => state.stub, send, readDraftFile, readChatFile, dataDir: () => dataDir, chatId: () => chatId };
 }

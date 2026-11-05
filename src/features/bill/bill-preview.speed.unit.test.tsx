@@ -4,6 +4,7 @@ import { totalsOf } from "@/features/draft/draft-totals";
 import { draftWith } from "@/features/draft/test-kit";
 import type { Draft, DraftItem } from "@/features/draft/types";
 import { BillPreview } from "./bill-preview";
+import { formatMoney } from "./bill-format";
 
 afterEach(cleanup);
 
@@ -17,11 +18,11 @@ function slowestPriceChange(draft: Draft): number {
   const { rerender } = render(<BillPreview bill={{ draft, totals: totalsOf(draft) }} />);
   let slowest = 0;
   for (let run = 0; run < RUNS; run += 1) {
-    const price = 60 + run;
+    const price = 1000 + run; // above every other line price (10+n up to 210 on 200 lines), so the text is new in the bill
     const next = withFirstPrice(draft, price);
     const startedAt = performance.now();
     rerender(<BillPreview bill={{ draft: next, totals: totalsOf(next) }} />);
-    expect(screen.getAllByText(price.toFixed(2)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(formatMoney(price)).length).toBeGreaterThan(0);
     slowest = Math.max(slowest, performance.now() - startedAt);
   }
   return slowest;

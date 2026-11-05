@@ -14,33 +14,36 @@ import {
 import type { AiLogEntry, AskAiDeps, AskAiInput, AskAiResult, Operation } from "./types";
 import { parseReply, type Reply } from "./validate-reply";
 
-type Ctx = AskAiDeps & LogContext & { canary: string };
-type Failure = Extract<AskAiResult, { ok: false }>;
+export type Ctx = AskAiDeps & LogContext & { canary: string };
+export type Failure = Extract<AskAiResult, { ok: false }>;
 
 const MAX_OCR_CHARS = 20_000; // per picture: a longer text is cut, so the number of AI calls stays bounded
 const MIN_CHUNK_CHARS = 500; // never split picture text into pieces smaller than this
 
 const defaultLog = (entry: AiLogEntry) => console.info("[ai]", JSON.stringify(entry));
-const failed = (code: Failure["code"], userMessage: string): Failure => ({ ok: false, code, userMessage });
+export const failed = (code: Failure["code"], userMessage: string): Failure => ({ ok: false, code, userMessage });
 
-class LeakDetected extends Error {}
+export class LeakDetected extends Error {}
+
+/** Runs one AI task with the shared set-up and turns every way it can break into a failure the user can read. */
+export async function withContext<T>(chatId: string, deps: AskAiDeps, task: (ctx: Ctx) => Promise<T>): Promise<T | Failure> {
+  const ctx: Ctx = { ...deps, log: deps.log ?? defaultLog, now: deps.now ?? (() => new Date()), canary: deps.canary ?? SERVER_CANARY };
+  try {
+    return await task(ctx);
+  } catch (error) {
+    if (error instanceof AiCallError) return failed("ai_unreachable", MESSAGE_AI_UNREACHABLE);
+    if (error instanceof LeakDetected) return failed("leak", MESSAGE_INTERNAL_INFO);
+    // Anything else is our own bug: say nothing about it to the user, log only that it happened
+    ctx.log({ at: ctx.now().toISOString(), event: "error", chatId });
+    return failed("ai_unreachable", MESSAGE_AI_UNREACHABLE);
+  }
+}
 
 /**
  * Turns a user message (and pictures) into operations for the draft. The draft is never touched here:
  * on any failure the caller simply keeps it as it is.
  */
-export async function askAi(input: AskAiInput, deps: AskAiDeps): Promise<AskAiResult> {
-  const ctx: Ctx = { ...deps, log: deps.log ?? defaultLog, now: deps.now ?? (() => new Date()), canary: deps.canary ?? SERVER_CANARY };
-  try {
-    return await run(input, ctx);
-  } catch (error) {
-    if (error instanceof AiCallError) return failed("ai_unreachable", MESSAGE_AI_UNREACHABLE);
-    if (error instanceof LeakDetected) return failed("leak", MESSAGE_INTERNAL_INFO);
-    // Anything else is our own bug: say nothing about it to the user, log only that it happened
-    ctx.log({ at: ctx.now().toISOString(), event: "error", chatId: input?.chatId });
-    return failed("ai_unreachable", MESSAGE_AI_UNREACHABLE);
-  }
-}
+export const askAi = (input: AskAiInput, deps: AskAiDeps): Promise<AskAiResult> => withContext(input?.chatId, deps, (ctx) => run(input, ctx));
 
 async function run(input: AskAiInput, ctx: Ctx): Promise<AskAiResult> {
   // The chat route checks this too; kept here so no caller can reach the AI with a longer text (FR-AI-080)

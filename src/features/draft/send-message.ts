@@ -3,13 +3,15 @@ import { askAi } from "@/features/ai/ask-ai";
 import { loadAiConfig } from "@/features/ai/config";
 import { MESSAGE_AI_UNREACHABLE } from "@/features/ai/messages";
 import type { AskAiResult } from "@/features/ai/types";
-import { addUserMessage } from "@/features/chat/messages";
+import { addUserMessage, historyBefore } from "@/features/chat/messages";
 import type { Store } from "@/features/storage/store";
 import { toAiDraft } from "./ai-draft";
 import { applyOperations, usesLineNumbers } from "./apply-operations";
 import { totalsOf } from "./draft-totals";
 import { netNotices } from "./net-notices";
 import { NOTICE_DRAFT_CHANGED, NOTICE_SAVE_FAILED } from "./notices";
+import { readShop } from "@/features/shop-header/shop-store";
+import { shopTurn } from "@/features/shop-header/shop-turn";
 import { parseDraft } from "./parse-draft";
 import type { Draft, SendMessageResponse, StoredMessage } from "./types";
 
@@ -26,8 +28,7 @@ export async function readDraft(store: Store, chatId: string): Promise<Draft> {
 async function askAboutDraft(store: Store, chatId: string, userMessage: StoredMessage, draft: Draft): Promise<AskAiResult> {
   const config = loadAiConfig();
   if (!config.apiKey) return { ok: false, code: "ai_unreachable", userMessage: MESSAGE_AI_UNREACHABLE };
-  const chat = await store.readJson<StoredChat>(files(store, chatId).chat);
-  const chatHistory = chat.messages.filter((m) => !(m.createdAt === userMessage.createdAt && m.text === userMessage.text));
+  const chatHistory = await historyBefore(store, chatId, userMessage);
   return askAi({ chatId, userText: userMessage.text, draft: toAiDraft(draft), chatHistory }, { config });
 }
 
@@ -57,17 +58,33 @@ function saveAnswer(store: Store, chatId: string, result: AskAiResult, shown: st
   });
 }
 
-/** One user message: store it, ask the AI, apply the operations, answer with the draft and totals the server computed. */
-export async function sendMessage(store: Store, chatId: string, text: string): Promise<SendMessageResponse> {
-  const { chat, message } = await addUserMessage(store, chatId, text);
+type AnsweredTurn = Turn & Pick<SendMessageResponse, "error" | "shopCard" | "shopCardHasBill">;
+
+async function draftTurn(store: Store, chatId: string, message: StoredMessage): Promise<AnsweredTurn> {
   const shown = await readDraft(store, chatId);
   const result = await askAboutDraft(store, chatId, message, shown);
   const turn = await saveAnswer(store, chatId, result, JSON.stringify(shown)).catch(async (): Promise<Turn> => ({
     draft: await readDraft(store, chatId).catch(() => parseDraft(null)), messages: [], notices: [NOTICE_SAVE_FAILED],
   }));
-  const updatedAt = turn.messages.at(-1)?.createdAt ?? chat.updatedAt;
+  return { ...turn, ...(result.ok ? {} : { error: result.code }) };
+}
+
+// Without a confirmed shop header a message can only be shop info; the bill stays as it is until the user presses "ใช้หัวบิลนี้"
+async function noShopTurn(store: Store, chatId: string, message: StoredMessage): Promise<AnsweredTurn> {
+  const { notices, card, hasBillContent, error } = await shopTurn(store, chatId, message);
   return {
-    chat: { ...chat, updatedAt }, message, messages: [message, ...turn.messages], draft: turn.draft, totals: totalsOf(turn.draft),
-    notices: turn.notices, ...(result.ok ? {} : { error: result.code }),
+    draft: await readDraft(store, chatId), messages: [], notices, ...(card ? { shopCard: card } : {}), ...(hasBillContent ? { shopCardHasBill: true as const } : {}), ...(error ? { error } : {}),
+  };
+}
+
+/** One user message: store it, ask the AI, apply the operations, answer with the draft and totals the server computed. */
+export async function sendMessage(store: Store, chatId: string, text: string): Promise<SendMessageResponse> {
+  const { chat, message } = await addUserMessage(store, chatId, text);
+  const shop = await readShop(store, chatId);
+  const { draft, messages, notices, shopCard, shopCardHasBill, error } = await (shop ? draftTurn : noShopTurn)(store, chatId, message);
+  const updatedAt = messages.at(-1)?.createdAt ?? chat.updatedAt;
+  return {
+    chat: { ...chat, updatedAt }, message, messages: [message, ...messages], draft, totals: totalsOf(draft), shop, notices,
+    ...(shopCard ? { shopCard } : {}), ...(shopCardHasBill ? { shopCardHasBill } : {}), ...(error ? { error } : {}),
   };
 }

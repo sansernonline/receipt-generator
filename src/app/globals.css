@@ -11,6 +11,8 @@
   --color-ink: #121216;
   --color-ink-2: #55555f;
   --color-ink-3: #8a8a96;
+  --color-err: #c81e1e;
+  --color-warn: #b45309;
   --font-sans: "Sarabun", "Noto Sans Thai", system-ui, sans-serif;
   --font-head: "Bai Jamjuree", "Sarabun", system-ui, sans-serif;
 }

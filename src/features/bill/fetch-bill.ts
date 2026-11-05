@@ -1,9 +1,11 @@
+import { parseShopHeader } from "@/features/shop-header/validate-shop";
 import type { BillData } from "./types";
 
 /** The server's draft + totals pair, or null when the data does not have that shape (a reply from the server is outside data: check it). */
 export function parseBill(raw: unknown): BillData | null {
-  const { draft, totals } = (raw ?? {}) as Partial<BillData>;
-  return Array.isArray(draft?.items) && Array.isArray(totals?.lines) ? { draft, totals } : null;
+  const { draft, totals, shop } = (raw ?? {}) as Partial<BillData>;
+  const isWhole = Array.isArray(draft?.items) && typeof draft.bill === "object" && draft.bill !== null && Array.isArray(totals?.lines) && totals.lines.length === draft.items.length;
+  return isWhole ? { draft, totals, shop: parseShopHeader(shop) } : null;
 }
 
 export async function fetchBill(chatId: string): Promise<BillData> {

@@ -8,6 +8,8 @@ import { acknowledgeAiNotice, hasAcknowledgedAiNotice } from "../consent/ai-noti
 import { BillPreview } from "../bill/bill-preview";
 import { fetchBill, parseBill } from "../bill/fetch-bill";
 import type { BillData } from "../bill/types";
+import { ShopCard } from "../shop-header/shop-card";
+import type { ShopFields } from "../shop-header/types";
 import { ChatPane, type ChatMessage } from "./chat-pane";
 import type { ChatListItem } from "./group-chats";
 import { AiWaitTimeout, postMessage } from "./post-message";
@@ -18,6 +20,7 @@ const SEND_FAILED = "ส่งข้อความไม่สำเร็จ �
 const AI_TIMED_OUT = "ยังไม่ได้รับคำตอบจาก AI ตรวจร่างบิลก่อนสั่งต่อ แล้วลองส่งอีกครั้งได้";
 const CONSENT_SAVE_LIMIT_MS = 10_000; // a hung request must not keep the notice locked: cancel and accept are off while saving
 const NOTICE_SAVE_FAILED = "บันทึกการรับทราบไม่สำเร็จ ลองอีกครั้ง";
+const SHOP_USED = "ใช้หัวบิลนี้แล้ว พิมพ์รายการสินค้าต่อได้เลย";
 
 export function ChatShell() {
   const [chats, setChats] = useState<ChatListItem[]>([]);
@@ -35,6 +38,8 @@ export function ChatShell() {
   const [openError, setOpenError] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [bill, setBill] = useState<BillData | null>(null);
+  // the AI proposal waiting for the user, with the typed text to send again after the shop is set (when it held items too); not stored, so both are gone when the chat is closed
+  const [shopCard, setShopCard] = useState<{ fields: ShopFields; followUp: string | null; ticket: number } | null>(null); // ticket = which open chat the card belongs to
   const [hasBillError, setHasBillError] = useState(false);
   const [isBillTab, setIsBillTab] = useState(false); // phone only: one of chat / bill fills the screen
   const newChatRef = useRef<HTMLButtonElement>(null);
@@ -78,6 +83,7 @@ export function ChatShell() {
     setSendError(null);
     setIsSending(false); // the waiting status belongs to the chat the message was sent from
     setBill(null);
+    setShopCard(null);
     setHasBillError(false);
     setIsDrawerOpen(false);
   }
@@ -87,11 +93,14 @@ export function ChatShell() {
     showChat(null, []); // the deleted chat was the open one; sending a message now starts a new chat
   }
 
-  async function createChat(): Promise<string> {
+  // null = the user opened another chat while this one was being made: it only joins the list, the screen stays where the user is
+  async function createChat(): Promise<string | null> {
+    const ticket = latestOpen.current;
     const res = await fetch("/api/chats", { method: "POST" });
     if (!res.ok) throw new Error("create failed");
     const { chat } = await res.json();
     putOnTop(chat);
+    if (ticket !== latestOpen.current) return null;
     showChat(chat.id, []);
     return chat.id;
   }
@@ -132,8 +141,8 @@ export function ChatShell() {
   }
 
   // the box is cleared and the user's bubble shows at once; if sending fails both are put back
-  async function sendMessage() {
-    const sentText = text;
+  async function sendMessage(again?: string) {
+    const sentText = again ?? text;
     const shown = activeId ? messages : [];
     setIsBusy(true);
     setIsSending(true);
@@ -141,14 +150,16 @@ export function ChatShell() {
     let ticket = latestOpen.current;
     try {
       const chatId = activeId ?? (await createChat());
+      if (chatId === null) return; // the user left for another chat; the empty new chat stays in the list
       ticket = latestOpen.current;
       setMessages([...shown, { role: "user", text: sentText }]);
-      setText("");
+      if (again === undefined) setText(""); // a text sent again by itself must not wipe what the user has started to type
       const answer = await postMessage(chatId, sentText);
       putOnTop(answer.chat); // the reply is stored on the server; opening that chat again shows it
       if (ticket !== latestOpen.current) return;
       setMessages([...shown, ...answer.messages, ...answer.notices.map((notice) => ({ role: "notice", text: notice }))]);
       setBill((current) => parseBill(answer) ?? current);
+      setShopCard((current) => (answer.shop ? null : answer.shopCard ? { fields: answer.shopCard, followUp: answer.shopCardHasBill ? sentText : null, ticket } : current)); // a new proposal replaces the old one; a message with no shop info keeps it
     } catch (error) {
       if (ticket !== latestOpen.current) return; // the user is on another chat now; its screen is not ours to change
       setMessages(shown);
@@ -158,6 +169,15 @@ export function ChatShell() {
       setIsSending(false);
       setIsBusy(false);
     }
+  }
+
+  function showShopUsed(shopBill: BillData, followUp: string | null, ticket: number) {
+    if (ticket !== latestOpen.current) return; // the user went to another chat while the shop was being saved: that chat shows its shop when opened again
+    setBill(shopBill);
+    setShopCard(null);
+    setStage(shopBill.draft.items.length ? "has-items" : "no-items");
+    setMessages((current) => [...current, { role: "assistant", text: SHOP_USED }]);
+    if (followUp) void sendMessage(followUp); // the AI notice was accepted before the first message, so this one may go too
   }
 
   // nothing leaves this machine for the AI before the user has seen the notice (NFR-PDPA-030)
@@ -195,7 +215,7 @@ export function ChatShell() {
     <div className="h-screen bg-desk p-0 lg:p-2.5">
       <div className="relative grid h-full overflow-hidden bg-white max-lg:grid-cols-[minmax(0,1fr)] max-lg:grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[288px_minmax(440px,1.1fr)_minmax(360px,560px)] lg:rounded-2xl lg:border lg:border-line lg:shadow-sm">
         <ChatList chats={chats} activeId={activeId} now={new Date()} isBusy={isBusy} isDrawerOpen={isDrawerOpen} hasListError={hasListError} hasCreateError={hasCreateError} newChatRef={newChatRef} onNewChat={startNewChat} onOpen={openChat} />
-        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} isSending={isSending} sendError={sendError} openError={openError} menuRef={menuRef} actions={active && <ChatActions chat={active} isDisabled={isBusy} onRenamed={putOnTop} onDeleted={removeChat} />} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={requestSend} isHiddenOnMobile={isBillTab} />
+        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} isSending={isSending} sendError={sendError} openError={openError} menuRef={menuRef} actions={active && <ChatActions chat={active} isDisabled={isBusy} onRenamed={putOnTop} onDeleted={removeChat} />} card={shopCard && activeId && <ShopCard key={JSON.stringify(shopCard)} card={shopCard.fields} hasFollowUp={shopCard.followUp !== null} chatId={activeId} onUsed={(shopBill) => showShopUsed(shopBill, shopCard.followUp, shopCard.ticket)} />} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={requestSend} isHiddenOnMobile={isBillTab} />
         {isNoticeOpen && <AiNoticeDialog isSaving={isNoticeSaving} error={noticeError} onAccept={acceptNotice} onClose={() => !isNoticeSaving && setIsNoticeOpen(false)} />}
         {isDrawerOpen && <button type="button" aria-label="ปิดประวัติแชต" onClick={() => setIsDrawerOpen(false)} className="absolute inset-0 z-40 bg-black/40 lg:hidden" />}
         <BillPreview bill={bill} hasError={hasBillError} className={isBillTab ? "" : "max-lg:hidden"} />

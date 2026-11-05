@@ -3,11 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { GET as getChat } from "@/app/api/chats/[id]/route";
+import { GET as getChat, PATCH as renameChat } from "@/app/api/chats/[id]/route";
 import { POST as postMessage } from "@/app/api/chats/[id]/messages/route";
 import { GET as getChats, POST as postChat } from "@/app/api/chats/route";
 import { KEY, okReply, useAiStub } from "@/features/ai/test-kit";
 import { acknowledgeAiNotice } from "@/features/consent/ai-notice-flag";
+import { confirmShop } from "@/features/shop-header/shop-store";
+import { cashShop } from "@/features/shop-header/test-kit";
+import { createStore } from "@/features/storage/store";
 import { ChatShell } from "./chat-shell";
 
 const { state } = useAiStub();
@@ -43,8 +46,13 @@ afterEach(async () => {
 
 test("[TC-CHAT-036] pressing Enter 3 more times while the AI is slow makes one message and one AI request", async () => {
   state.stub.script("text", { ...okReply(), delayMs: 1_000 });
+  // a chat with a confirmed shop header: without one the message would be read as shop info (FR-HDR-060)
+  const { chat } = await (await postChat(new Request("http://localhost/api/chats", { method: "POST", headers }))).json();
+  await confirmShop(createStore(dataDir), chat.id, cashShop);
+  await renameChat(new Request(`http://localhost/api/chats/${chat.id}`, { method: "PATCH", headers, body: JSON.stringify({ title: "ร้านทดสอบ" }) }), { params: Promise.resolve({ id: chat.id }) });
   render(<ChatShell />);
-  await screen.findByText("ยังไม่มีแชต");
+  fireEvent.click(await screen.findByRole("button", { name: "ร้านทดสอบ" }));
+  await screen.findByRole("heading", { name: "ร้านทดสอบ" }); // the chat is open: opening it clears the box, so type after
   const box = screen.getByRole("textbox", { name: "ข้อความ" });
   fireEvent.change(box, { target: { value: TEXT } });
   await waitFor(() => expect(screen.getByRole("button", { name: "ส่ง" })).toBeEnabled()); // enabled = the chat list has loaded

@@ -1,0 +1,118 @@
+"use client";
+
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { TEMPLATES, type TemplateId } from "@/features/bill/bill-templates";
+import type { BillData } from "@/features/bill/types";
+import { type FieldMessages, submitShop } from "./submit-shop";
+import type { ShopFields } from "./types";
+import { checkShop, hasErrors } from "./validate-shop";
+
+/* slop-ok: placeholder-label every input has a visible label from Field; the scan cannot see it through the spread props */
+type Props = { card: ShopFields; hasFollowUp: boolean; chatId: string; onUsed: (bill: BillData) => void };
+type FieldProps = { label: string; error?: string; warning?: string; className?: string; children: (props: { id: string; describedBy?: string }) => ReactNode };
+
+const control = "h-10 w-full min-w-0 rounded-[10px] border border-line-2 bg-white px-3 text-ink aria-invalid:border-err";
+
+function Field({ label, error, warning, className = "", children }: FieldProps) {
+  const id = useId();
+  const messageId = `${id}-message`;
+  const message = error ?? warning;
+  return (
+    <div className={`grid min-w-0 content-start gap-1 text-xs ${className}`}>
+      <label htmlFor={id} className="text-ink-2">
+        {label}
+      </label>
+      {children({ id, describedBy: message ? messageId : undefined })}
+      {message && (
+        <p id={messageId} className={error ? "text-err" : "text-warn"}>
+          {message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The shop header the AI proposed. Nothing here touches the bill: only "ใช้หัวบิลนี้" sends the fields, and the bill shows them
+ * after the server has saved them (FR-HDR-070 · 080).
+ */
+export function ShopCard({ card, hasFollowUp, chatId, onUsed }: Props) {
+  const [shop, setShop] = useState<ShopFields>(card);
+  const [pressCount, setPressCount] = useState(0); // errors show from the first press; each press moves focus to the first one
+  const [isSaving, setIsSaving] = useState(false);
+  const [refused, setRefused] = useState<{ message: string; fields: FieldMessages } | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const problems = checkShop(shop);
+  const errors: FieldMessages = pressCount ? { ...problems.errors, ...refused?.fields } : {};
+  const edit = (key: keyof ShopFields) => (event: { target: { value: string } }) => setShop({ ...shop, [key]: event.target.value });
+  const text = (key: Exclude<keyof ShopFields, "template">, id: string, describedBy?: string) => ({
+    id, value: shop[key], onChange: edit(key), "aria-invalid": !!errors[key], "aria-describedby": describedBy, autoComplete: "off", className: control,
+  });
+
+  useEffect(() => {
+    if (pressCount) formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [pressCount]);
+
+  async function use(event: FormEvent) {
+    event.preventDefault();
+    setRefused(null);
+    setPressCount((count) => count + 1);
+    if (hasErrors(problems)) return;
+    setIsSaving(true);
+    const result = await submitShop(chatId, shop);
+    setIsSaving(false);
+    if (result.ok) onUsed(result.bill);
+    else setRefused(result);
+  }
+
+  return (
+    <section aria-label="การ์ดหัวร้าน" className="max-w-[92%] self-start">
+      <p className="w-fit max-w-full rounded-2xl bg-surface-2 px-3 py-2">ตั้งหัวร้านจากข้อความของคุณแล้ว ตรวจให้ตรงกับร้าน แก้ช่องไหนก็ได้ แล้วกด “ใช้หัวบิลนี้”</p>
+      <form ref={formRef} onSubmit={use} noValidate className="mt-3 overflow-hidden rounded-[20px] border border-line bg-white">
+        <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+          <Field label="ชื่อร้าน" error={errors.shopName} className="sm:col-span-2">
+            {({ id, describedBy }) => <input {...text("shopName", id, describedBy)} />}
+          </Field>
+          <Field label="ที่อยู่" error={errors.address} className="sm:col-span-2">
+            {({ id, describedBy }) => <textarea {...text("address", id, describedBy)} rows={2} className={`${control} h-16 resize-none py-2`} />}
+          </Field>
+          <Field label="เลขประจำตัวผู้เสียภาษี (13 หลัก)" error={errors.taxId} warning={problems.warnings.taxId}>
+            {({ id, describedBy }) => <input {...text("taxId", id, describedBy)} inputMode="numeric" placeholder="0000000000000" />}
+          </Field>
+          <Field label="โทรศัพท์" error={errors.phone}>
+            {({ id, describedBy }) => <input {...text("phone", id, describedBy)} inputMode="tel" />}
+          </Field>
+          <Field label="แม่แบบ / ชนิดเอกสาร">
+            {({ id }) => (
+              <select id={id} value={shop.template} onChange={(event) => setShop({ ...shop, template: event.target.value as TemplateId })} className={control}>
+                {TEMPLATES.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+          <Field label="อีเมล" error={errors.email}>
+            {({ id, describedBy }) => <input {...text("email", id, describedBy)} inputMode="email" />}
+          </Field>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 border-t border-line px-4 py-3">
+          <button type="submit" disabled={isSaving} className="h-10 rounded-full bg-accent-fill px-4 font-semibold text-white disabled:opacity-60">
+            ใช้หัวบิลนี้
+          </button>
+          {refused && (
+            <p role="alert" className="text-xs text-err">
+              {refused.message}
+            </p>
+          )}
+        </div>
+      </form>
+      <p className="mt-3 text-xs text-ink-3">
+        ตัวอย่างบิลยังไม่ใช้ค่านี้ จนกว่าจะกด “ใช้หัวบิลนี้” แก้ช่องไหนก็ได้ก่อน
+        {hasFollowUp && " หลังกดใช้หัวบิลนี้ ระบบจะทำรายการในข้อความเดิมต่อให้ ถ้าปิดแชตหรือโหลดหน้าใหม่ก่อน ข้อความที่เก็บไว้จะหายพร้อมการ์ด"}
+      </p>
+    </section>
+  );
+}

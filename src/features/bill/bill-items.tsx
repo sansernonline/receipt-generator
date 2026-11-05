@@ -16,7 +16,7 @@ export function BillItems({ template, draft, totals }: Props) {
       <thead>
         <tr>
           {columns.map(({ header, align, minWidth = "" }) => (
-            <th key={header} scope="col" className={`${minWidth} border-b border-ink bg-[#f5f5f9] px-1.5 py-1.5 font-semibold ${ALIGN[align]}`}>
+            <th key={header} scope="col" className={`${minWidth} whitespace-nowrap border-b border-ink bg-[#f5f5f9] px-1.5 py-1.5 font-semibold @max-[460px]:px-1 @max-[460px]:text-[11px] ${ALIGN[align]}`}>
               {header}
             </th>
           ))}
@@ -26,7 +26,7 @@ export function BillItems({ template, draft, totals }: Props) {
         {draft.items.map((item, index) => (
           <tr key={index}>
             {columns.map(({ header, align, cell, minWidth }) => (
-              <td key={header} className={`${minWidth ? `${minWidth} break-words` : "whitespace-nowrap"} border-b border-[#d8d8e0] px-1.5 py-1 align-top ${ALIGN[align]}`}>
+              <td key={header} className={`${minWidth ? `${minWidth} break-words` : "whitespace-nowrap"} border-b border-[#d8d8e0] px-1.5 py-1 align-top @max-[460px]:px-1 ${ALIGN[align]}`}>
                 {cell({ item, index, amount: totals.lines[index].amount })}
               </td>
             ))}

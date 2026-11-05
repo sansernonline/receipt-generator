@@ -24,20 +24,20 @@ const MAX_QUOTED_BY = 80;
 const MAX_TEXT = 500;
 const MAX_NUMBER = 1e9;
 
-type Check = (value: unknown) => string | null;
-type Fields = Record<string, Check>;
+export type Check = (value: unknown) => string | null;
+export type Fields = Record<string, Check>;
 
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+export const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 const number: Check = (v) => (typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= MAX_NUMBER ? null : "ต้องเป็นตัวเลขที่ไม่เกิน 1,000,000,000");
 const positive: Check = (v) => number(v) ?? ((v as number) > 0 ? null : "ต้องมากกว่า 0");
 const notNegative: Check = (v) => number(v) ?? ((v as number) >= 0 ? null : "ต้องไม่ติดลบ");
 const line: Check = (v) => (Number.isInteger(v) && (v as number) >= 1 ? null : "ต้องเป็นเลขบรรทัด");
-const text = (max = MAX_TEXT): Check => (v) =>
+export const text = (max = MAX_TEXT): Check => (v) =>
   typeof v !== "string" || v.length < 1 ? "ต้องเป็นข้อความที่ไม่ว่าง" : v.length > max ? `ยาวเกิน ${max} ตัวอักษร` : null;
-const orNull = (check: Check): Check => (v) => (v === null ? null : check(v));
+export const orNull = (check: Check): Check => (v) => (v === null ? null : check(v));
 const stringOrNull: Check = (v) => (typeof v === "string" || v === null ? null : "ต้องเป็นข้อความหรือ null");
-const oneOf = (...allowed: (string | null)[]): Check => (v) => (allowed.includes(v as string | null) ? null : "ค่าไม่อยู่ในรายการที่ใช้ได้");
+export const oneOf = (...allowed: (string | null)[]): Check => (v) => (allowed.includes(v as string | null) ? null : "ค่าไม่อยู่ในรายการที่ใช้ได้");
 const percentOrAmount: Check = (v) => oneOf("amount", "percent")(v);
 
 const dateFields: Fields = {
@@ -83,7 +83,7 @@ const operationFields: Record<string, Fields> = {
 };
 
 /** Every listed field must be present, no other field may appear. */
-function object(value: unknown, fields: Fields): string | null {
+export function object(value: unknown, fields: Fields): string | null {
   if (!isObject(value)) return "ต้องเป็นออบเจกต์";
   if (Object.keys(value).some((k) => !Object.hasOwn(fields, k))) return "มีช่องที่ไม่รู้จัก";
   for (const [key, check] of Object.entries(fields)) {
@@ -124,7 +124,7 @@ const replyFields: Fields = {
 };
 
 // The model sometimes wraps JSON in a code fence or chatter (PROMPT-LIBRARY 2.3 steps 1-2)
-function extractJson(raw: string): unknown {
+export function extractJson(raw: string): unknown {
   const start = raw.indexOf("{");
   const end = raw.lastIndexOf("}");
   if (start < 0 || end < start) return undefined;

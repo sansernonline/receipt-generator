@@ -11,8 +11,8 @@ export type Column = { header: string; align: "left" | "center" | "right"; cell:
 const isIncomplete = ({ item }: Row) => item.qty === null || item.unitPrice === null;
 const number = (header: string): Column => ({ header, align: "center", cell: ({ index }) => index + 1 });
 const code: Column = { header: "รหัสสินค้า", align: "left", cell: ({ item }) => item.code };
-const name = (header: string): Column => ({ header, align: "left", minWidth: "min-w-28", cell: ({ item }) => item.name });
-const description: Column = { header: "รายละเอียด", align: "left", minWidth: "min-w-24", cell: ({ item }) => item.description };
+const name = (header: string): Column => ({ header, align: "left", minWidth: "min-w-28 @max-[460px]:min-w-20", cell: ({ item }) => item.name });
+const description: Column = { header: "รายละเอียด", align: "left", minWidth: "min-w-24 @max-[460px]:min-w-16", cell: ({ item }) => item.description };
 const quantity = (header: string): Column => ({
   header,
   align: "center",

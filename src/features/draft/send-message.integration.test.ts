@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { POST } from "@/app/api/chats/[id]/messages/route";
 import { KEY, addWater, okReply, refuseReply, useAiStub } from "@/features/ai/test-kit";
 import { createChat } from "@/features/chat/chats";
+import { confirmShop } from "@/features/shop-header/shop-store";
+import { cashShop } from "@/features/shop-header/test-kit";
 import { createStore } from "@/features/storage/store";
 import { reply } from "../../../test/ai-stub/ai-stub";
 import { coffee, croissant, draftWith } from "./test-kit";
@@ -32,6 +34,7 @@ beforeEach(async () => {
   const store = createStore(dataDir);
   chatId = (await createChat(store)).id;
   await store.writeJsonAtomic(chatPath("draft.json"), draftWith());
+  await confirmShop(store, chatId, cashShop); // the bill commands below need a confirmed shop header (FR-HDR-060)
   // stand-in for the version folder (the versions row defines the real one): v1 must stay as it is
   await store.writeJsonAtomic(chatPath("versions", "v1.json"), { net: 295 });
 });
@@ -97,6 +100,8 @@ describe("POST /api/chats/[id]/messages with the draft", () => {
 
   test("[TC-HDR-030] add_item and set_discount change the draft; the chat keeps its shop and the draft has no header", async () => {
     const shopBefore = JSON.parse(await fsp.readFile(chatPath("chat.json"), "utf8")).shopId;
+    const shopFile = path.join(dataDir, "shops", shopBefore, "shop.json");
+    const shopJsonBefore = await fsp.readFile(shopFile, "utf8");
     state.stub.script("text", ok(addWater), ok({ op: "set_discount", type: "percent", value: 10 }));
 
     await send("เพิ่มน้ำเปล่า 1 ขวด 10");
@@ -107,6 +112,7 @@ describe("POST /api/chats/[id]/messages with the draft", () => {
     expect(draft.footer.discount).toEqual({ kind: "percent", value: 10 });
     expect(Object.keys(draft).sort()).toEqual(["bill", "footer", "items"]);
     expect(JSON.parse(await fsp.readFile(chatPath("chat.json"), "utf8")).shopId).toBe(shopBefore);
+    expect(JSON.parse(await fsp.readFile(shopFile, "utf8"))).toEqual(JSON.parse(shopJsonBefore));
   });
 
   test("[TC-DOC-004] 3 edits overwrite the one draft and leave the version folder with v1 untouched", async () => {

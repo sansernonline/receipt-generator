@@ -19,3 +19,9 @@ export function addUserMessage(store: Store, chatId: string, text: string, now: 
     return { chat: { id: updated.id, title: updated.title, updatedAt: updated.updatedAt }, message };
   });
 }
+
+/** The messages before this one: what the AI may read as history (the message itself goes in on its own). */
+export async function historyBefore(store: Store, chatId: string, message: { text: string; createdAt: string }) {
+  const chat = await store.readJson<{ messages: { role: "user" | "assistant"; text: string; createdAt: string }[] }>(path.join(store.chatDir(chatId), "chat.json"));
+  return chat.messages.filter((m) => !(m.createdAt === message.createdAt && m.text === message.text));
+}

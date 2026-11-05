@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import type { BillInfo } from "@/features/draft/types";
+import type { ShopHeader } from "@/features/shop-header/types";
 import type { TemplateId } from "./bill-templates";
 import { Missing } from "./missing";
 
-type Props = { bill: BillInfo; dateText: string; dueText: string | null };
+type Props = { bill: BillInfo; shop: ShopHeader | null; dateText: string; dueText: string | null };
 
 const Label = ({ children }: { children: ReactNode }) => <span className="text-ink-2">{children}</span>;
 const Field = ({ label, children }: { label: string; children: ReactNode }) => (
@@ -14,13 +15,26 @@ const Field = ({ label, children }: { label: string; children: ReactNode }) => (
 const contactOf = ({ customerPhone, customerEmail }: BillInfo) =>
   [customerPhone && `โทร ${customerPhone}`, customerEmail && `อีเมล ${customerEmail}`].filter(Boolean).join(" · ");
 
-// simple: the shop header is not stored yet (rows 35 · 38), so every template shows the "no shop header" placeholder
-function ShopBlock() {
+const Small = ({ children }: { children: ReactNode }) => <p className="break-words text-[12px] leading-snug text-ink-2">{children}</p>;
+
+// the shop header of the chat; a missing tax id is marked red except on the invoice, which is not checked against section 86/4 or 105 bis (FR-HDR-160 · 180 · 240)
+function ShopBlock({ shop }: { shop: ShopHeader | null }) {
+  if (!shop) {
+    return (
+      <div className="min-w-0">
+        <p className="text-[15px] font-semibold">
+          <Missing>ยังไม่มีหัวร้าน</Missing>
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="min-w-0">
-      <p className="text-[15px] font-semibold">
-        <Missing>ยังไม่มีหัวร้าน</Missing>
-      </p>
+      <p className="break-words text-[15px] font-semibold leading-snug">{shop.shopName}</p>
+      {shop.address && <Small>{shop.address}</Small>}
+      {(shop.taxId || shop.template !== "invoice") && <Small>{shop.taxId ? `เลขประจำตัวผู้เสียภาษี ${shop.taxId}` : <Missing>ยังไม่มีเลขประจำตัวผู้เสียภาษี</Missing>}</Small>}
+      {shop.phone && <Small>โทร {shop.phone}</Small>}
+      {shop.email && <Small>อีเมล {shop.email}</Small>}
     </div>
   );
 }
@@ -34,23 +48,23 @@ function Title({ th, en }: { th: string; en: string }) {
   );
 }
 
-const TopRow = ({ th, en }: { th: string; en: string }) => (
+const TopRow = ({ th, en, shop }: { th: string; en: string; shop: ShopHeader | null }) => (
   <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
-    <ShopBlock />
+    <ShopBlock shop={shop} />
     <Title th={th} en={en} />
   </div>
 );
 
 const Meta = ({ children }: { children: ReactNode }) => <div className="mb-3 mt-5 grid grid-cols-[1fr_auto] gap-x-4 gap-y-0.5 border-y border-t-ink border-b-[#d8d8e0] py-3">{children}</div>;
 
-function CashHead({ bill, dateText }: Props) {
+function CashHead({ bill, shop, dateText }: Props) {
   return (
     <>
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3">
         <div className="pt-1">
           เล่มที่ <span className="inline-block min-w-14 border-b border-ink text-center">&nbsp;</span>
         </div>
-        <ShopBlock />
+        <ShopBlock shop={shop} />
         <div className="pt-1">
           เลขที่ <span className="inline-block min-w-14 border-b border-ink text-center">{bill.billNumber}</span>
         </div>
@@ -71,10 +85,10 @@ function CashHead({ bill, dateText }: Props) {
   );
 }
 
-function ReceiptHead({ bill, dateText }: Props) {
+function ReceiptHead({ bill, shop, dateText }: Props) {
   return (
     <>
-      <TopRow th="ใบเสร็จรับเงิน" en="RECEIPT" />
+      <TopRow th="ใบเสร็จรับเงิน" en="RECEIPT" shop={shop} />
       <Meta>
         <Field label="ลูกค้า">{bill.customerName ?? "เงินสด (ทั่วไป)"}</Field>
         <div className="text-right">
@@ -91,10 +105,10 @@ function ReceiptHead({ bill, dateText }: Props) {
   );
 }
 
-function TaxInvoiceHead({ bill, dateText }: Props) {
+function TaxInvoiceHead({ bill, shop, dateText }: Props) {
   return (
     <>
-      <TopRow th="ใบกำกับภาษี/ใบเสร็จรับเงิน" en="TAX INVOICE / RECEIPT" />
+      <TopRow th="ใบกำกับภาษี/ใบเสร็จรับเงิน" en="TAX INVOICE / RECEIPT" shop={shop} />
       <div className="mt-3 border border-ink">
         <p className="border-b border-ink bg-[#f5f5f9] px-2 py-0.5 font-semibold">ผู้ซื้อ</p>
         <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 p-2">
@@ -112,10 +126,10 @@ function TaxInvoiceHead({ bill, dateText }: Props) {
   );
 }
 
-function InvoiceHead({ bill, dateText, dueText }: Props) {
+function InvoiceHead({ bill, shop, dateText, dueText }: Props) {
   return (
     <>
-      <TopRow th="ใบแจ้งหนี้" en="Invoice" />
+      <TopRow th="ใบแจ้งหนี้" en="Invoice" shop={shop} />
       <Meta>
         <div>
           <Field label="วันที่">{dateText}</Field>

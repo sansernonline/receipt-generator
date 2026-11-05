@@ -25,9 +25,11 @@ function EmptyState() {
 
 /** The bill beside the chat: the paper shows only the bill; the status sits above it, outside the paper (FR-DOC-120). */
 export function BillPreview({ bill, hasError = false, className = "" }: Props) {
-  const [templateId, setTemplateId] = useState<TemplateId>(DEFAULT_TEMPLATE);
+  const [pickedId, setPickedId] = useState<TemplateId>(DEFAULT_TEMPLATE);
+  const shop = bill?.shop ?? null;
+  const templateId = shop?.template ?? pickedId; // the confirmed shop header decides the template; the picker is only for a chat without one
   const template = templateOf(templateId);
-  const hasBill = bill !== null && bill.draft.items.length > 0;
+  const hasBill = bill !== null && (bill.draft.items.length > 0 || shop !== null);
   const status = hasBill ? NOT_ISSUED : hasError ? LOAD_FAILED : "";
 
   return (
@@ -35,8 +37,8 @@ export function BillPreview({ bill, hasError = false, className = "" }: Props) {
       <header className="flex min-h-[52px] items-center gap-2 px-4">
         <h2 className="font-head text-lg font-semibold">ตัวอย่างบิล</h2>
         {hasBill && <span className="text-ink-3">{template.paper}</span>}
-        {hasBill && (
-          <select aria-label="แม่แบบ" value={templateId} onChange={(event) => setTemplateId(event.target.value as TemplateId)} className="ml-auto h-8 min-w-0 rounded-full border border-line-2 bg-transparent px-3 text-xs">
+        {hasBill && !shop && (
+          <select aria-label="แม่แบบ" value={pickedId} onChange={(event) => setPickedId(event.target.value as TemplateId)} className="ml-auto h-8 min-w-0 rounded-full border border-line-2 bg-transparent px-3 text-xs">
             {TEMPLATES.map(({ id, name }) => (
               <option key={id} value={id}>
                 {name}
