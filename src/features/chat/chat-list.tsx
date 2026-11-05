@@ -1,5 +1,6 @@
-import type { RefObject } from "react";
+import { useState, type RefObject } from "react";
 import { groupChatsByDay, type ChatListItem } from "./group-chats";
+import { searchChats } from "./search-chats";
 
 type Props = {
   chats: ChatListItem[];
@@ -15,6 +16,9 @@ type Props = {
 };
 
 export function ChatList({ chats, activeId, now, isBusy, isDrawerOpen, hasListError, hasCreateError, newChatRef, onNewChat, onOpen }: Props) {
+  const [query, setQuery] = useState("");
+  const shown = searchChats(chats, query);
+
   return (
     // below lg the list is a drawer that slides over the chat; invisible while closed so it cannot take focus
     <aside
@@ -40,13 +44,24 @@ export function ChatList({ chats, activeId, now, isBusy, isDrawerOpen, hasListEr
       <input
         type="search"
         aria-label="ค้นหาแชต"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
         placeholder="ค้นหาชื่อแชต ลูกค้า เลขที่บิล"
         className="mx-3 h-10 rounded-full border border-line-2 px-4 text-sm"
       />
       <nav aria-label="รายการแชต" className="flex-1 overflow-auto p-3 text-sm">
         {hasListError && <p className="p-2 text-accent">โหลดรายการแชตไม่ได้</p>}
         {!hasListError && chats.length === 0 && <p className="p-2 text-ink-3">ยังไม่มีแชต</p>}
-        {groupChatsByDay(chats, now).map((group) => (
+        {!hasListError && chats.length > 0 && shown.length === 0 && (
+          <div role="status" className="p-2 text-ink-3">
+            <p className="font-semibold text-ink-2">{`ไม่พบแชตที่มี “${query.trim()}”`}</p>
+            <p>ลองค้นด้วยชื่อลูกค้าหรือเลขที่บิลอื่น</p>
+            <button type="button" onClick={() => setQuery("")} className="mt-2 h-8 rounded-full border border-line-2 px-3 text-xs font-semibold hover:bg-surface-2">
+              ล้างคำค้น
+            </button>
+          </div>
+        )}
+        {groupChatsByDay(shown, now).map((group) => (
           <section key={group.label}>
             <h2 className="px-2 pb-0.5 pt-3 text-xs font-semibold text-ink-3">{`${group.label} (${group.chats.length})`}</h2>
             <ul>

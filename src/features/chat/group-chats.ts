@@ -1,6 +1,6 @@
 import { todayInBangkok, type ThaiDate } from "@/features/thai-date/thai-date";
 
-export type ChatListItem = { id: string; title: string; updatedAt: string; isStale?: boolean };
+export type ChatListItem = { id: string; title: string; updatedAt: string; isStale?: boolean; customerName?: string | null; billNumber?: string | null };
 export type ChatGroup = { label: string; chats: ChatListItem[] };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
