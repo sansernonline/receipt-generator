@@ -8,6 +8,7 @@ import type { Store } from "@/features/storage/store";
 import { toAiDraft } from "./ai-draft";
 import { applyOperations, usesLineNumbers } from "./apply-operations";
 import { totalsOf } from "./draft-totals";
+import { netNotices } from "./net-notices";
 import { NOTICE_DRAFT_CHANGED, NOTICE_SAVE_FAILED } from "./notices";
 import { parseDraft } from "./parse-draft";
 import type { Draft, SendMessageResponse, StoredMessage } from "./types";
@@ -52,7 +53,7 @@ function saveAnswer(store: Store, chatId: string, result: AskAiResult, shown: st
     if (result.operations.length > 0) await store.writeJsonAtomic(files(store, chatId).draft, applied.draft);
     await store.writeJsonAtomic(chatFile, updated);
     await store.upsertIndex(updated);
-    return { draft: applied.draft, messages: [reply], notices: [] };
+    return { draft: applied.draft, messages: [reply], notices: netNotices(draft, applied.draft) };
   });
 }
 
