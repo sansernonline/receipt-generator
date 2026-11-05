@@ -3,9 +3,10 @@ import { countChars } from "@/features/chat/chat-title";
 import { LogContext, logLeak, logged } from "./call-log";
 import { OUTPUT_TOKENS, inputBudgetChars, splitForBudget } from "./chunk-text";
 import { AiCallError, complete, ocrPage } from "./connector";
+import { IMAGE_LIMIT_PER_MINUTE, sharedImageLimiter } from "./image-limiter";
 import { hasLeak } from "./leak";
 import { refusalMessage } from "./refusals";
-import { MESSAGE_AI_UNREACHABLE, MESSAGE_INTERNAL_INFO, MESSAGE_INVALID_REPLY, MESSAGE_TOO_LONG } from "./messages";
+import { MESSAGE_AI_UNREACHABLE, MESSAGE_INTERNAL_INFO, MESSAGE_INVALID_REPLY, MESSAGE_TOO_LONG, MESSAGE_TOO_MANY_IMAGES, messageWaitForImages } from "./messages";
 import {
   DEFAULT_IMAGE_REQUEST, PROMPT_ID, PROMPT_VERSION, SERVER_CANARY,
   bangkokDate, buildRetryMessage, buildSystem, buildUserMessage, fitHistory,
@@ -31,6 +32,8 @@ class LeakDetected extends Error {}
 export async function askAi(input: AskAiInput, deps: AskAiDeps): Promise<AskAiResult> {
   // The chat route checks this too; kept here so no caller can reach the AI with a longer text (FR-AI-080)
   if (countChars(input.userText) > MAX_MESSAGE_CHARS) return failed("message_too_long", MESSAGE_TOO_LONG);
+  const refusedImages = checkImageLimit(input, deps);
+  if (refusedImages) return refusedImages;
   const ctx: Ctx = { ...deps, log: deps.log ?? defaultLog, now: deps.now ?? (() => new Date()), canary: deps.canary ?? SERVER_CANARY };
   try {
     const system = buildSystem(ctx.canary);
@@ -47,6 +50,15 @@ export async function askAi(input: AskAiInput, deps: AskAiDeps): Promise<AskAiRe
     if (error instanceof LeakDetected) return failed("leak", MESSAGE_INTERNAL_INFO);
     throw error;
   }
+}
+
+/** Counts the pictures of this message against the per-minute limit before any OCR call (FR-AI-090 · 120). */
+function checkImageLimit(input: AskAiInput, deps: AskAiDeps): Failure | null {
+  const count = input.images?.length ?? 0;
+  if (count === 0) return null;
+  if (count > IMAGE_LIMIT_PER_MINUTE) return failed("rate_limited", MESSAGE_TOO_MANY_IMAGES);
+  const taken = (deps.imageLimiter ?? sharedImageLimiter).take(count);
+  return taken.ok ? null : failed("rate_limited", messageWaitForImages(taken.waitSeconds));
 }
 
 /** One message without pictures; with pictures, one per piece of text that fits the token budget. */

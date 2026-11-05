@@ -1,6 +1,7 @@
 import { afterEach, beforeEach } from "vitest";
 import { type AiStub, reply, startAiStub } from "../../../test/ai-stub/ai-stub";
 import { askAi } from "./ask-ai";
+import { createImageLimiter } from "./image-limiter";
 import type { AiConfig, AiLogEntry, AskAiDeps, AskAiInput } from "./types";
 
 // Shared set-up for the tests that talk to the fake AI service.
@@ -27,6 +28,6 @@ export function useAiStub() {
     baseUrl: state.stub.baseUrl, apiKey: KEY, modelText: "m-text", modelOcr: "typhoon-ocr", maxTokens: 8192, timeoutMs: 60_000, ...over,
   });
   const ask = (i: AskAiInput = input(), deps: Partial<AskAiDeps> = {}) =>
-    askAi(i, { config: configFor(), log: (e) => state.logs.push(e), canary: CANARY, ...deps });
+    askAi(i, { config: configFor(), log: (e) => state.logs.push(e), canary: CANARY, imageLimiter: createImageLimiter(), ...deps });
   return { state, configFor, ask };
 }

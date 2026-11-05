@@ -1,3 +1,5 @@
+import type { ImageLimiter } from "./image-limiter";
+
 export type AiConfig = {
   baseUrl: string;
   apiKey: string;
@@ -39,6 +41,8 @@ export type AskAiDeps = {
   log?: (entry: AiLogEntry) => void;
   now?: () => Date;
   canary?: string;
+  /** Default: one counter for the whole server process (FR-AI-090). */
+  imageLimiter?: ImageLimiter;
 };
 
 export type AskAiFailure = "message_too_long" | "rate_limited" | "ai_unreachable" | "invalid_reply" | "refused" | "leak";
