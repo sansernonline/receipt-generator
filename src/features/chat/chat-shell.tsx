@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChatActions } from "./chat-actions";
 import { ChatList } from "./chat-list";
 import { ChatPane, type ChatMessage } from "./chat-pane";
 import type { ChatListItem } from "./group-chats";
@@ -124,7 +125,7 @@ export function ChatShell() {
     <div className="h-screen bg-desk p-0 lg:p-2.5">
       <div className="relative grid h-full overflow-hidden bg-white lg:grid-cols-[288px_minmax(440px,1.1fr)_minmax(360px,560px)] lg:rounded-2xl lg:border lg:border-line lg:shadow-sm">
         <ChatList chats={chats} activeId={activeId} now={new Date()} isBusy={isBusy} isDrawerOpen={isDrawerOpen} hasListError={hasListError} hasCreateError={hasCreateError} newChatRef={newChatRef} onNewChat={startNewChat} onOpen={openChat} />
-        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} hasSendError={hasSendError} openError={openError} menuRef={menuRef} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={sendMessage} />
+        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} hasSendError={hasSendError} openError={openError} menuRef={menuRef} actions={active && <ChatActions chat={active} isDisabled={isBusy} onRenamed={putOnTop} />} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={sendMessage} />
         {isDrawerOpen && <button type="button" aria-label="ปิดประวัติแชต" onClick={() => setIsDrawerOpen(false)} className="absolute inset-0 z-40 bg-black/40 lg:hidden" />}
         <section aria-label="ตัวอย่างบิล" className="hidden items-center justify-center border-l border-line bg-desk text-sm text-ink-3 lg:flex">
           ตัวอย่างบิลจะแสดงที่นี่

@@ -7,9 +7,11 @@ const HIDDEN_CHARS = /[\p{Cc}‪-‮⁦-⁩]/gu;
 
 export const countChars = (text: string) => graphemesOf(text).length;
 
+export const cleanTitle = (text: string) => text.replace(/\s+/g, " ").replace(HIDDEN_CHARS, "").trim();
+
 // cut at the last space inside the limit so a word is not split; no space to cut at -> hard cut at the limit
 export function titleFromMessage(message: string): string {
-  const chars = graphemesOf(message.replace(/\s+/g, " ").replace(HIDDEN_CHARS, "").trim());
+  const chars = graphemesOf(cleanTitle(message));
   if (chars.length <= MAX_TITLE_CHARS) return chars.join("");
   const head = chars.slice(0, MAX_TITLE_CHARS);
   const lastSpace = chars[MAX_TITLE_CHARS] === " " ? MAX_TITLE_CHARS : head.lastIndexOf(" ");

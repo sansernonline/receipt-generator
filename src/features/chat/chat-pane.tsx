@@ -1,4 +1,4 @@
-import { useRef, type FormEvent, type KeyboardEvent, type RefObject } from "react";
+import { useRef, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { chipsFor, type ChatStage } from "./quick-chips";
 
 export type ChatMessage = { role: string; text: string };
@@ -12,13 +12,14 @@ type Props = {
   hasSendError: boolean;
   openError: string | null;
   menuRef: RefObject<HTMLButtonElement | null>;
+  actions?: ReactNode;
   onOpenDrawer: () => void;
   onTextChange: (text: string) => void;
   onFillText: (text: string) => void;
   onSend: () => void;
 };
 
-export function ChatPane({ title, messages, text, stage, isBusy, hasSendError, openError, menuRef, onOpenDrawer, onTextChange, onFillText, onSend }: Props) {
+export function ChatPane({ title, messages, text, stage, isBusy, hasSendError, openError, menuRef, actions, onOpenDrawer, onTextChange, onFillText, onSend }: Props) {
   const boxRef = useRef<HTMLTextAreaElement>(null);
 
   function fillBox(fillText: string) {
@@ -48,7 +49,8 @@ export function ChatPane({ title, messages, text, stage, isBusy, hasSendError, o
             <path d="M4 7h16M4 12h16M4 17h16" />
           </svg>
         </button>
-        <h1 className="font-head text-lg font-semibold">{title}</h1>
+        <h1 className="min-w-0 break-words font-head text-lg font-semibold">{title}</h1>
+        {actions}
       </header>
       <section aria-label="บทสนทนา" className="flex flex-1 flex-col gap-2 overflow-auto p-4 text-sm">
         {openError && (
