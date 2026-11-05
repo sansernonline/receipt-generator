@@ -51,6 +51,7 @@ export type StoredMessage = { role: "user" | "assistant"; text: string; createdA
  *   totals always come from calcTotals, never from the AI.
  * - notices: Thai texts the UI shows as they are (AI failure, refusal, limits, warnings).
  * - error: machine code (askAi failure code) when the AI gave nothing usable; the Thai text is in notices.
+ * - canUndo: there is an edit to take back (FR-ITEM-120); the button is off otherwise.
  * - shop: the chat's confirmed shop header, null until the user presses "ใช้หัวบิลนี้".
  * - shopCard: the AI's proposal for the shop header while the chat has none; the user reviews it, nothing is saved (FR-HDR-070).
  * - shopCardHasBill: the same message also holds customer or items; the browser sends it again once the shop is set (PROMPT-LIBRARY P-002).
@@ -66,5 +67,6 @@ export type SendMessageResponse = {
   shopCard?: ShopFields;
   shopCardHasBill?: true;
   notices: string[];
+  canUndo: boolean;
   error?: string;
 };

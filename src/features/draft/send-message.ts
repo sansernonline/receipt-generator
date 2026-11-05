@@ -13,6 +13,7 @@ import { NOTICE_DRAFT_CHANGED, NOTICE_SAVE_FAILED } from "./notices";
 import { readShop } from "@/features/shop-header/shop-store";
 import { shopTurn } from "@/features/shop-header/shop-turn";
 import { parseDraft } from "./parse-draft";
+import { pushUndo, readUndo } from "./undo-history";
 import type { Draft, SendMessageResponse, StoredMessage } from "./types";
 
 type StoredChat = { id: string; title: string; updatedAt: string; shopId: string | null; billNumber: string | null; customerName: string | null; messages: StoredMessage[] };
@@ -51,7 +52,10 @@ function saveAnswer(store: Store, chatId: string, result: AskAiResult, shown: st
     const chatFile = files(store, chatId).chat;
     const chat = await store.readJson<StoredChat>(chatFile);
     const updated = { ...chat, updatedAt: reply.createdAt, messages: [...chat.messages, reply] };
-    if (result.operations.length > 0) await store.writeJsonAtomic(files(store, chatId).draft, applied.draft);
+    if (result.operations.length > 0) {
+      await pushUndo(store, chatId, draft);
+      await store.writeJsonAtomic(files(store, chatId).draft, applied.draft);
+    }
     await store.writeJsonAtomic(chatFile, updated);
     await store.upsertIndex(updated);
     return { draft: applied.draft, messages: [reply], notices: netNotices(draft, applied.draft) };
@@ -84,7 +88,7 @@ export async function sendMessage(store: Store, chatId: string, text: string): P
   const { draft, messages, notices, shopCard, shopCardHasBill, error } = await (shop ? draftTurn : noShopTurn)(store, chatId, message);
   const updatedAt = messages.at(-1)?.createdAt ?? chat.updatedAt;
   return {
-    chat: { ...chat, updatedAt }, message, messages: [message, ...messages], draft, totals: totalsOf(draft), shop, notices,
+    chat: { ...chat, updatedAt }, message, messages: [message, ...messages], draft, totals: totalsOf(draft), shop, notices, canUndo: (await readUndo(store, chatId)).length > 0,
     ...(shopCard ? { shopCard } : {}), ...(shopCardHasBill ? { shopCardHasBill } : {}), ...(error ? { error } : {}),
   };
 }

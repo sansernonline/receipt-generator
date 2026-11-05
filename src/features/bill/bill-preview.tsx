@@ -7,7 +7,7 @@ import type { BillData } from "./types";
 const LOAD_FAILED = "โหลดตัวอย่างบิลไม่ได้ ลองเปิดแชตอีกครั้ง";
 const NOT_ISSUED = "ยังไม่ออกบิล";
 
-type Props = { bill: BillData | null; hasError?: boolean; className?: string };
+type Props = { bill: BillData | null; hasError?: boolean; isUndoBlocked?: boolean; onUndo?: () => void; className?: string };
 
 function EmptyState() {
   return (
@@ -24,7 +24,7 @@ function EmptyState() {
 }
 
 /** The bill beside the chat: the paper shows only the bill; the status sits above it, outside the paper (FR-DOC-120). */
-export function BillPreview({ bill, hasError = false, className = "" }: Props) {
+export function BillPreview({ bill, hasError = false, isUndoBlocked = false, onUndo, className = "" }: Props) {
   const [pickedId, setPickedId] = useState<TemplateId>(DEFAULT_TEMPLATE);
   const shop = bill?.shop ?? null;
   const templateId = shop?.template ?? pickedId; // the confirmed shop header decides the template; the picker is only for a chat without one
@@ -37,14 +37,21 @@ export function BillPreview({ bill, hasError = false, className = "" }: Props) {
       <header className="flex min-h-[52px] items-center gap-2 px-4">
         <h2 className="font-head text-lg font-semibold">ตัวอย่างบิล</h2>
         {hasBill && <span className="text-ink-3">{template.paper}</span>}
-        {hasBill && !shop && (
-          <select aria-label="แม่แบบ" value={pickedId} onChange={(event) => setPickedId(event.target.value as TemplateId)} className="ml-auto h-8 min-w-0 rounded-full border border-line-2 bg-transparent px-3 text-xs">
-            {TEMPLATES.map(({ id, name }) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </select>
+        {hasBill && (
+          <span className="ml-auto flex min-w-0 items-center gap-2">
+            {!shop && (
+              <select aria-label="แม่แบบ" value={pickedId} onChange={(event) => setPickedId(event.target.value as TemplateId)} className="h-8 min-w-0 rounded-full border border-line-2 bg-transparent px-3 text-xs">
+                {TEMPLATES.map(({ id, name }) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button type="button" disabled={!bill.canUndo || isUndoBlocked} onClick={onUndo} title="ย้อนการแก้ครั้งล่าสุด" className="h-8 rounded-full border border-line-2 px-3 text-xs enabled:hover:bg-surface-2 disabled:opacity-50">
+              ย้อนกลับ
+            </button>
+          </span>
         )}
       </header>
       <div aria-live="polite" className="px-4 empty:px-0">

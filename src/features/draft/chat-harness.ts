@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach } from "vitest";
 import { POST } from "@/app/api/chats/[id]/messages/route";
+import { POST as undoRoute } from "@/app/api/chats/[id]/undo/route";
 import { KEY, useAiStub } from "@/features/ai/test-kit";
 import { createChat } from "@/features/chat/chats";
 import { confirmShop } from "@/features/shop-header/shop-store";
@@ -40,7 +41,12 @@ export function useChatWithDraft(startDraft: () => Draft, { hasShop = true } = {
     const request = new Request(`http://localhost/api/chats/${chatId}/messages`, { method: "POST", headers, body: JSON.stringify({ text }) });
     return (await POST(request, { params: Promise.resolve({ id: chatId }) })).json();
   }
+  async function undo() {
+    const request = new Request(`http://localhost/api/chats/${chatId}/undo`, { method: "POST", headers });
+    const res = await undoRoute(request, { params: Promise.resolve({ id: chatId }) });
+    return { status: res.status, body: await res.json() };
+  }
   const readDraftFile = async () => JSON.parse(await fsp.readFile(draftPath(), "utf8")) as Draft;
   const readChatFile = async () => JSON.parse(await fsp.readFile(path.join(dataDir, "chats", chatId, "chat.json"), "utf8"));
-  return { stub: () => state.stub, send, readDraftFile, readChatFile, dataDir: () => dataDir, chatId: () => chatId };
+  return { stub: () => state.stub, send, undo, readDraftFile, readChatFile, dataDir: () => dataDir, chatId: () => chatId };
 }

@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
+import { cashShop } from "@/features/shop-header/test-kit";
 import { totalsOf } from "@/features/draft/draft-totals";
 import { draftWith } from "@/features/draft/test-kit";
 import type { BillInfo, Draft } from "@/features/draft/types";
@@ -182,4 +183,19 @@ test("[FR-TOT-020] VAT lines and the net amount are the server's totals, not rec
 
   expect(paper()).toHaveTextContent("12,345.67");
   expect(paper()).toHaveTextContent("99,999.99");
+});
+
+test("[TC-ITEM-035] with nothing edited yet the undo button cannot be pressed", () => {
+  render(<BillPreview bill={{ ...billOf(draftWith([])), shop: { id: "s1", ...cashShop } }} onUndo={() => undefined} />);
+
+  expect(screen.getByRole("button", { name: "ย้อนกลับ" })).toBeDisabled();
+});
+
+test("[FR-ITEM-120] after an edit the undo button asks the page to undo", () => {
+  const onUndo = vi.fn();
+  render(<BillPreview bill={{ ...billOf(draftWith()), canUndo: true }} onUndo={onUndo} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "ย้อนกลับ" }));
+
+  expect(onUndo).toHaveBeenCalledOnce();
 });
