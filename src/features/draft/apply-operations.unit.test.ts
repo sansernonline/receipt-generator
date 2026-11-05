@@ -52,4 +52,26 @@ describe("applyOperations (closed set, all or nothing)", () => {
     expect(draft.footer.discount).toEqual({ kind: "percent", value: 10 });
     expect(Object.keys(draft).sort()).toEqual(["bill", "footer", "items"]);
   });
+
+  it("[TC-ITEM-003] add_item with a null price adds the line with a blank price", () => {
+    const { draft, isApplied } = applyOperations(draftWith([]), [{ ...addWater, unit_price: null }]);
+
+    expect(isApplied).toBe(true);
+    expect(draft.items[0].unitPrice).toBeNull();
+  });
+
+  it("update_item cannot blank a price", () => {
+    const result = applyOperations(draftWith(), [{ op: "update_item", line: 1, set: { unit_price: null } }]);
+
+    expect(result.isApplied).toBe(false);
+  });
+
+  it.each([{ qty: 0 }, { qty: null }, { unit_price: -5 }])("[TC-ITEM-002] add_item with %o is refused", (bad) => {
+    const before = draftWith();
+
+    const result = applyOperations(before, [{ ...addWater, ...bad }]);
+
+    expect(result.isApplied).toBe(false);
+    expect(result.draft).toBe(before);
+  });
 });

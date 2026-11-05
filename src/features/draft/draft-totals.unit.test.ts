@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { totalsOf } from "./draft-totals";
+import { hasIncompleteLine, totalsOf } from "./draft-totals";
 import { draftWith } from "./test-kit";
 
 describe("totalsOf", () => {
@@ -14,5 +14,11 @@ describe("totalsOf", () => {
     const totals = totalsOf(draft);
 
     expect(totals.lines.map((l) => l.amount)).toEqual([0, 130]);
+  });
+
+  it("[TC-ITEM-003] hasIncompleteLine is false for a full draft and true when a price or qty is blank", () => {
+    const blank = (over: object) => draftWith([{ ...draftWith().items[0], ...over }]);
+
+    expect([hasIncompleteLine(draftWith()), hasIncompleteLine(blank({ unitPrice: null })), hasIncompleteLine(blank({ qty: null }))]).toEqual([false, true, true]);
   });
 });

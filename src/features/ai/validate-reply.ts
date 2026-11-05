@@ -69,7 +69,7 @@ const billInfoFields: Fields = {
 };
 
 const operationFields: Record<string, Fields> = {
-  add_item: itemFields,
+  add_item: { ...itemFields, unit_price: orNull(notNegative) }, // no price yet is allowed for a new line (FR-TOT-140)
   update_item: { line, set: (v) => partial(v, itemFields) },
   remove_item: { line },
   set_line_discount: { line, type: percentOrAmount, value: notNegative },

@@ -33,6 +33,11 @@ const ITEM_FIELDS: Record<string, FieldRule<DraftItem>> = {
   code: { key: "code", isValid: isTextOrNull },
   description: { key: "description", isValid: isTextOrNull },
 };
+// a new line may come without a price (FR-TOT-140: it stays in the draft but the bill cannot be issued); an edit may not blank one
+const NEW_ITEM_FIELDS: Record<string, FieldRule<DraftItem>> = {
+  ...ITEM_FIELDS,
+  unit_price: { key: "unitPrice", isValid: (v) => v === null || isNotNegative(v) },
+};
 const BILL_FIELDS: Record<string, FieldRule<BillInfo>> = {
   customer_name: { key: "customerName", isValid: isTextOrNull },
   customer_address: { key: "customerAddress", isValid: isTextOrNull },
@@ -94,7 +99,7 @@ const PAYMENT_METHODS = ["cash", "transfer", "cheque", null];
 const handlers: Record<string, Handler> = {
   add_item(draft, op) {
     const { op: _name, ...fields } = op; // only the six item fields are read, anything else (a "total") makes the operation unusable
-    const item = readFields(fields, ITEM_FIELDS, true);
+    const item = readFields(fields, NEW_ITEM_FIELDS, true);
     return item && { ...draft, items: [...draft.items, { ...item, discount: null } as DraftItem] };
   },
   update_item(draft, op) {

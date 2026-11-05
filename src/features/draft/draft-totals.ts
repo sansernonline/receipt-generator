@@ -13,3 +13,6 @@ function lineOf({ qty, unitPrice, discount }: DraftItem): LineInput {
 /** Every amount on the bill comes from here, never from the AI (FR-TOT-020). Throws RangeError for an impossible discount. */
 export const totalsOf = (draft: Draft): BillTotals =>
   calcTotals({ lines: draft.items.map(lineOf), vat: draft.footer.vat, discount: draft.footer.discount ?? undefined });
+
+/** True while a line has no qty or no price: the draft keeps it, but the bill cannot be issued (FR-TOT-140). */
+export const hasIncompleteLine = (draft: Draft): boolean => draft.items.some(({ qty, unitPrice }) => qty === null || unitPrice === null);

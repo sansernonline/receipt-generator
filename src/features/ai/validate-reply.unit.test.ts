@@ -119,4 +119,10 @@ describe("parseReply", () => {
     expect(parse(okReply([{ op: "set_remarks", text: "ก".repeat(501) }])).ok).toBe(false);
     expect(parse(okReply([{ op: "set_remarks", text: "ก".repeat(500) }])).ok).toBe(true);
   });
+
+  it("[TC-ITEM-003] add_item may have a null price; update_item and qty may not", () => {
+    expect(parse(okReply([addItem({ unit_price: null })])).ok).toBe(true);
+    expect(parse(okReply([{ op: "update_item", line: 1, set: { unit_price: null } }])).ok).toBe(false);
+    expect(parse(okReply([addItem({ qty: null })])).ok).toBe(false);
+  });
 });
