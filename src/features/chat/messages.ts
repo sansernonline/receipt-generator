@@ -11,7 +11,7 @@ export function addUserMessage(store: Store, chatId: string, text: string, now: 
   return store.withChatLock(chatId, async () => {
     const file = path.join(store.chatDir(chatId), "chat.json");
     const chat = await store.readJson<StoredChat>(file);
-    const message = { role: "user", text, createdAt: now.toISOString() };
+    const message = { role: "user" as const, text, createdAt: now.toISOString() };
     const isFirst = chat.messages.length === 0;
     const updated = { ...chat, title: isFirst ? titleFromMessage(text) : chat.title, updatedAt: message.createdAt, messages: [...chat.messages, message] };
     await store.writeJsonAtomic(file, updated);

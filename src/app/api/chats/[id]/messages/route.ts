@@ -1,6 +1,7 @@
 import { isAllowedOrigin } from "@/features/chat/same-origin";
 import { countChars } from "@/features/chat/chat-title";
-import { addUserMessage, MAX_MESSAGE_CHARS } from "@/features/chat/messages";
+import { MAX_MESSAGE_CHARS } from "@/features/chat/messages";
+import { sendMessage } from "@/features/draft/send-message";
 import { failure, storageFailure } from "@/features/chat/route-errors";
 import { isValidId } from "@/features/storage/ids";
 import { createStore } from "@/features/storage/store";
@@ -19,7 +20,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const text = await readText(request);
   if (text === null) return failure("ข้อความว่างหรือยาวเกิน 10,000 ตัวอักษร", 400);
   try {
-    return Response.json(await addUserMessage(createStore(), id, text), { status: 201 });
+    return Response.json(await sendMessage(createStore(), id, text), { status: 201 });
   } catch (error) {
     return storageFailure(error, "บันทึกข้อความไม่สำเร็จ ลองอีกครั้ง");
   }
