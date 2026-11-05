@@ -1,16 +1,18 @@
 import type { Operation } from "@/features/ai/types";
 import type { Discount } from "@/features/totals/types";
-import { isRealDate } from "@/features/thai-date/thai-date";
+import { countChars } from "@/features/chat/chat-title";
+import { isRealDate, todayInBangkok } from "@/features/thai-date/thai-date";
 import { totalsOf } from "./draft-totals";
-import { NOTICE_BAD_VALUE, NOTICE_HEADER_BY_BUTTON, NOTICE_NOT_SUPPORTED, NOTICE_TOO_MANY_OPERATIONS, NOTICE_TOTAL_IS_COMPUTED } from "./notices";
+import { NOTICE_BAD_PAYMENT_METHOD, NOTICE_BAD_VALUE, NOTICE_HEADER_BY_BUTTON, NOTICE_NOT_SUPPORTED, NOTICE_REMARKS_TOO_LONG, NOTICE_TOO_MANY_OPERATIONS, NOTICE_TOTAL_IS_COMPUTED } from "./notices";
 import { parseDate } from "./parse-draft";
-import type { BillInfo, Draft, DraftItem, PaymentMethod } from "./types";
+import type { BillInfo, DateParts, Draft, DraftItem, PaymentMethod } from "./types";
 
 export type ApplyResult = { draft: Draft; isApplied: boolean; notices: string[] };
 type Handler = (draft: Draft, op: Operation) => Draft | null; // null = a value is not usable
 
 const MAX_OPERATIONS = 50; // simple: self-set ceiling for one message, the SRS gives none
 const MAX_TEXT = 500;
+const MAX_REMARKS = 500; // visible characters, FR-TOT-090
 const MAX_MONEY = 1e9;
 // simple: calcTotals works in whole satang and multiplies by up to 1e4 (percent) and 1e3 (qty); a bill under 1e9 baht keeps every step below
 // the safe integer limit. Self-set ceiling, the SRS gives none. validate-reply is the first gate, this is the second.
@@ -97,6 +99,12 @@ function discountOf({ type, value }: Operation): Discount | null {
 const VAT_MODES = { none: "none", included: "inclusive", excluded: "exclusive" } as const;
 const PAYMENT_METHODS = ["cash", "transfer", "cheque", null];
 
+// FR-TOT-130: a date typed without a year means this year in Bangkok; the day is checked against that year (29 Feb)
+function withYear(v: unknown): DateParts | null {
+  const date = parseDate(v);
+  return date && date.y === null ? { ...date, y: todayInBangkok(new Date()).yearBE, era: "BE" } : date;
+}
+
 const handlers: Record<string, Handler> = {
   add_item(draft, op) {
     const { op: _name, ...fields } = op; // only the six item fields are read, anything else (a "total") makes the operation unusable
@@ -126,14 +134,15 @@ const handlers: Record<string, Handler> = {
     return withFooter(draft, { vat: { ...draft.footer.vat, mode: VAT_MODES[op.mode as keyof typeof VAT_MODES] } });
   },
   set_payment(draft, op) {
-    if (!PAYMENT_METHODS.includes(op.method as string | null) || !isRealDateOrNull(op.date)) return null;
-    return withFooter(draft, { paymentMethod: op.method as PaymentMethod | null, paymentDate: op.date === null ? null : parseDate(op.date) });
+    const date = op.date === null ? null : withYear(op.date);
+    if (!PAYMENT_METHODS.includes(op.method as string | null) || (op.date !== null && (!date || !isRealDate(date)))) return null;
+    return withFooter(draft, { paymentMethod: op.method as PaymentMethod | null, paymentDate: date });
   },
   set_payment_detail(draft, op) {
     return isTextOrNull(op.text) ? withFooter(draft, { paymentDetail: op.text as string | null }) : null;
   },
   set_remarks(draft, op) {
-    return typeof op.text === "string" && op.text.length <= MAX_TEXT ? withFooter(draft, { remarks: op.text || null }) : null;
+    return typeof op.text === "string" && countChars(op.text) <= MAX_REMARKS ? withFooter(draft, { remarks: op.text || null }) : null;
   },
   set_bill_info(draft, op) {
     const fields = readFields(op.fields, BILL_FIELDS, false);
@@ -151,6 +160,12 @@ function refusalNotice(op: unknown): string {
 }
 
 const isKnown = (op: unknown): op is Operation => isRecord(op) && typeof op.op === "string" && Object.hasOwn(handlers, op.op);
+// simple: a remark of only spaces is kept as typed, no trimming (FR-TOT-090 gives no rule)
+// the two footer fields with their own limits get their own text, every other bad value gets the general one
+function badValueNotice(op: Operation): string {
+  if (op.op === "set_remarks" && typeof op.text === "string") return NOTICE_REMARKS_TOO_LONG;
+  return op.op === "set_payment" && !PAYMENT_METHODS.includes(op.method as string | null) ? NOTICE_BAD_PAYMENT_METHOD : NOTICE_BAD_VALUE;
+}
 const refuse = (draft: Draft, notice: string): ApplyResult => ({ draft, isApplied: false, notices: [notice] });
 
 // e.g. a line discount larger than the line: calcTotals refuses it, so the draft must not take it
@@ -178,7 +193,7 @@ export function applyOperations(before: Draft, operations: unknown[]): ApplyResu
     const line = hasLine ? currentLine(op.line, positions) : null;
     if (hasLine && line === null) return refuse(before, NOTICE_BAD_VALUE);
     const next = handlers[op.op](draft, hasLine ? { ...op, line } : op);
-    if (!next) return refuse(before, NOTICE_BAD_VALUE);
+    if (!next) return refuse(before, badValueNotice(op));
     if (op.op === "remove_item") positions = afterRemoval(positions, (line as number) - 1);
     draft = next;
   }

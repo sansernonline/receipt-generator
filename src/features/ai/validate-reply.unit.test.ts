@@ -113,11 +113,16 @@ describe("parseReply", () => {
     expect(result.ok === false && result.errors.join().length).toBeLessThan(200);
   });
 
-  it("[review] numbers above 1e9, general text above 500 and remarks above 500 are rejected", () => {
+  it("[review] numbers above 1e9 and general text above 500 are rejected", () => {
     expect(parse(okReply([addItem({ unit_price: 1e10 })])).ok).toBe(false);
     expect(parse(okReply([addItem({ unit: "ก".repeat(501) })])).ok).toBe(false);
-    expect(parse(okReply([{ op: "set_remarks", text: "ก".repeat(501) }])).ok).toBe(false);
-    expect(parse(okReply([{ op: "set_remarks", text: "ก".repeat(500) }])).ok).toBe(true);
+  });
+
+  it("[TC-TOT-032][TC-TOT-034] method kind and remarks length are left to applyOperations; a non-string still fails here", () => {
+    expect(parse(okReply([{ op: "set_payment", method: "credit_card", date: null }])).ok).toBe(true);
+    expect(parse(okReply([{ op: "set_remarks", text: "ก".repeat(501) }])).ok).toBe(true);
+    expect(parse(okReply([{ op: "set_payment", method: 7, date: null }])).ok).toBe(false);
+    expect(parse(okReply([{ op: "set_remarks", text: 7 }])).ok).toBe(false);
   });
 
   it("[TC-ITEM-003] add_item may have a null price; update_item and qty may not", () => {

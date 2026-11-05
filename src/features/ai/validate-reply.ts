@@ -20,7 +20,6 @@ const MAX_DESCRIPTION = 500;
 const MAX_PAYMENT_DETAIL = 300;
 const MAX_QUOTE_REF = 30;
 const MAX_QUOTED_BY = 80;
-const MAX_REMARKS = 500; // FR-TOT-090
 // Self-set safe ceilings (SRS 6.2 gives none for these): keep absurd values from the model out of the bill
 const MAX_TEXT = 500;
 const MAX_NUMBER = 1e9;
@@ -37,6 +36,7 @@ const line: Check = (v) => (Number.isInteger(v) && (v as number) >= 1 ? null : "
 const text = (max = MAX_TEXT): Check => (v) =>
   typeof v !== "string" || v.length < 1 ? "ต้องเป็นข้อความที่ไม่ว่าง" : v.length > max ? `ยาวเกิน ${max} ตัวอักษร` : null;
 const orNull = (check: Check): Check => (v) => (v === null ? null : check(v));
+const stringOrNull: Check = (v) => (typeof v === "string" || v === null ? null : "ต้องเป็นข้อความหรือ null");
 const oneOf = (...allowed: (string | null)[]): Check => (v) => (allowed.includes(v as string | null) ? null : "ค่าไม่อยู่ในรายการที่ใช้ได้");
 const percentOrAmount: Check = (v) => oneOf("amount", "percent")(v);
 
@@ -75,9 +75,10 @@ const operationFields: Record<string, Fields> = {
   set_line_discount: { line, type: percentOrAmount, value: notNegative },
   set_discount: { type: percentOrAmount, value: notNegative },
   set_vat_mode: { mode: oneOf("none", "included", "excluded") },
-  set_payment: { method: oneOf("cash", "transfer", "cheque", null), date: orNull(date) },
+  // simple: method and remarks length are judged in applyOperations (3 kinds, 500 visible characters) so the user gets the specific notice
+  set_payment: { method: stringOrNull, date: orNull(date) },
   set_payment_detail: { text: orNull(text(MAX_PAYMENT_DETAIL)) },
-  set_remarks: { text: (v) => (typeof v === "string" && v.length <= MAX_REMARKS ? null : `ต้องเป็นข้อความไม่เกิน ${MAX_REMARKS} ตัวอักษร`) },
+  set_remarks: { text: (v) => (typeof v === "string" ? null : "ต้องเป็นข้อความ") },
   set_bill_info: { fields: (v) => partial(v, billInfoFields) },
 };
 
