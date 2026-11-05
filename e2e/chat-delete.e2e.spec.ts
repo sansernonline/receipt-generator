@@ -3,9 +3,12 @@ import { expect, test, type Page } from "@playwright/test";
 const list = (page: Page) => page.getByRole("navigation", { name: "รายการแชต" });
 
 async function startChatWith(page: Page, text: string) {
+  const items = list(page).getByRole("listitem");
   const newChat = page.getByRole("button", { name: "แชตใหม่", exact: true }).first(); // list items can carry the same name
+  await expect(newChat).toBeEnabled(); // enabled again = the list has loaded
+  const before = await items.count();
   await newChat.click();
-  await expect(newChat).toBeEnabled(); // the box is cleared when the new chat has opened; typing earlier is lost
+  await expect(items).toHaveCount(before + 1); // the new chat is listed once it is created; the box is cleared then, so type after
   await page.getByRole("textbox", { name: "ข้อความ" }).fill(text);
   await page.getByRole("button", { name: "ส่ง", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(text, { timeout: 20_000 });
