@@ -49,7 +49,7 @@ export function ChatShell() {
   // a late list response can already contain the chat, so never add the same id twice
   const putOnTop = (chat: ChatListItem) => setChats((current) => [chat, ...current.filter((item) => item.id !== chat.id)]);
 
-  function showChat(id: string, shownMessages: ChatMessage[], shownStage: ChatStage = "no-shop") {
+  function showChat(id: string | null, shownMessages: ChatMessage[], shownStage: ChatStage = "no-shop") {
     latestOpen.current += 1; // a reply still on its way for an earlier click is now out of date
     setActiveId(id);
     setMessages(shownMessages);
@@ -58,6 +58,11 @@ export function ChatShell() {
     setOpenError(null);
     setHasSendError(false);
     setIsDrawerOpen(false);
+  }
+
+  function removeChat(id: string) {
+    setChats((current) => current.filter((chat) => chat.id !== id));
+    showChat(null, []); // the deleted chat was the open one; sending a message now starts a new chat
   }
 
   async function createChat(): Promise<string> {
@@ -125,7 +130,7 @@ export function ChatShell() {
     <div className="h-screen bg-desk p-0 lg:p-2.5">
       <div className="relative grid h-full overflow-hidden bg-white lg:grid-cols-[288px_minmax(440px,1.1fr)_minmax(360px,560px)] lg:rounded-2xl lg:border lg:border-line lg:shadow-sm">
         <ChatList chats={chats} activeId={activeId} now={new Date()} isBusy={isBusy} isDrawerOpen={isDrawerOpen} hasListError={hasListError} hasCreateError={hasCreateError} newChatRef={newChatRef} onNewChat={startNewChat} onOpen={openChat} />
-        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} hasSendError={hasSendError} openError={openError} menuRef={menuRef} actions={active && <ChatActions chat={active} isDisabled={isBusy} onRenamed={putOnTop} />} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={sendMessage} />
+        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} hasSendError={hasSendError} openError={openError} menuRef={menuRef} actions={active && <ChatActions chat={active} isDisabled={isBusy} onRenamed={putOnTop} onDeleted={removeChat} />} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={sendMessage} />
         {isDrawerOpen && <button type="button" aria-label="ปิดประวัติแชต" onClick={() => setIsDrawerOpen(false)} className="absolute inset-0 z-40 bg-black/40 lg:hidden" />}
         <section aria-label="ตัวอย่างบิล" className="hidden items-center justify-center border-l border-line bg-desk text-sm text-ink-3 lg:flex">
           ตัวอย่างบิลจะแสดงที่นี่

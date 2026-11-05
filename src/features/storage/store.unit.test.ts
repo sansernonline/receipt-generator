@@ -133,6 +133,53 @@ describe("index", () => {
   });
 });
 
+describe("removing a chat", () => {
+  it("removeChat deletes the whole chat folder and nothing else", async () => {
+    const store = createStore(dir);
+    const gone = await seedChat(store);
+    const kept = await seedChat(store);
+    await fsp.mkdir(path.join(store.chatDir(gone), "uploads"), { recursive: true });
+    await fsp.writeFile(path.join(store.chatDir(gone), "uploads", "a.png"), "x");
+
+    await store.removeChat(gone);
+
+    expect(await fsp.readdir(path.join(dir, "chats"))).toEqual([kept]);
+  });
+
+  it("removeChat on a folder that is already gone does not throw", async () => {
+    const store = createStore(dir);
+
+    await expect(store.removeChat(store.newId())).resolves.toBeUndefined();
+  });
+
+  it("removeChat refuses an id that is not a UUID", async () => {
+    await expect(createStore(dir).removeChat("..")).rejects.toThrow("invalid id");
+  });
+
+  it("removeFromIndex drops one row and keeps the others in order", async () => {
+    const store = createStore(dir);
+    const older = await seedChat(store, "2026-01-01T00:00:00Z");
+    const middle = await seedChat(store, "2026-02-01T00:00:00Z");
+    const newer = await seedChat(store, "2026-03-01T00:00:00Z");
+    await store.rebuildIndex();
+
+    await store.removeFromIndex(middle);
+
+    const rows = JSON.parse(await fsp.readFile(path.join(dir, "index.json"), "utf8")).chats;
+    expect(rows.map((row: { id: string }) => row.id)).toEqual([newer, older]);
+  });
+
+  it("removeFromIndex with a missing or corrupt index leaves a list that matches the folders", async () => {
+    const store = createStore(dir);
+    const kept = await seedChat(store);
+    await fsp.writeFile(path.join(dir, "index.json"), "{not json");
+
+    await store.removeFromIndex(store.newId());
+
+    expect((await store.readIndex()).chats.map((c) => c.id)).toEqual([kept]);
+  });
+});
+
 describe("data dir", () => {
   it("uses BILLGEN_DATA_DIR when set", () => {
     expect(getDataDir({ [DATA_DIR_ENV]: dir })).toBe(path.resolve(dir));

@@ -44,20 +44,26 @@ const indexLock = (dir: string) => `index:${dir}`;
 
 export const rebuildIndex = (ops: FileOps, dir: string) => withLock(indexLock(dir), () => rebuildUnlocked(ops, dir));
 
-// change one row instead of reading every chat; never throws, because the chat file is already saved (ARCH 4.1 rule 3)
-export function upsertIndexEntry(ops: FileOps, dir: string, chat: ChatSummary): Promise<void> {
+// change rows of the index file instead of reading every chat; never throws, because the chat file is already saved (ARCH 4.1 rule 3)
+function changeIndex(ops: FileOps, dir: string, change: (rows: ChatSummary[]) => ChatSummary[]): Promise<void> {
   const file = path.join(dir, "index.json");
   return withLock(indexLock(dir), async () => {
     try {
       const index = await readJson<ChatIndex>(ops, file).catch(() => null);
       if (!Array.isArray(index?.chats)) return void (await rebuildUnlocked(ops, dir));
-      const chats = [toSummary(chat), ...index.chats.filter((row) => row.id !== chat.id)];
-      await writeJsonAtomic(ops, file, { chats: chats.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
+      const chats = change(index.chats).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      await writeJsonAtomic(ops, file, { chats });
     } catch {
       await ops.rm(file, { force: true }).catch(() => undefined); // no index -> the next read rebuilds it
     }
   });
 }
+
+export const upsertIndexEntry = (ops: FileOps, dir: string, chat: ChatSummary) =>
+  changeIndex(ops, dir, (rows) => [toSummary(chat), ...rows.filter((row) => row.id !== chat.id)]);
+
+// a deleted chat's folder is already gone, so a rebuild (index unreadable) cannot bring its row back
+export const removeIndexEntry = (ops: FileOps, dir: string, chatId: string) => changeIndex(ops, dir, (rows) => rows.filter((row) => row.id !== chatId));
 
 // ARCH 4.1 rule 3: index missing, corrupt or not matching chats/ -> rebuild from the folder
 export async function loadIndex(ops: FileOps, dir: string): Promise<ChatIndex> {

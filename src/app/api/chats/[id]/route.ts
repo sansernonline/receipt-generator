@@ -1,3 +1,4 @@
+import { deleteChat } from "@/features/chat/delete-chat";
 import { openChat } from "@/features/chat/open-chat";
 import { checkRenameTitle, renameChat } from "@/features/chat/rename-chat";
 import { failure, storageFailure } from "@/features/chat/route-errors";
@@ -28,5 +29,18 @@ export async function PATCH(request: Request, { params }: Context) {
     return Response.json({ chat: await renameChat(createStore(), id, checked.title) });
   } catch (error) {
     return storageFailure(error, "เปลี่ยนชื่อไม่สำเร็จ ลองอีกครั้ง");
+  }
+}
+
+// only the delete button and its confirm box send this; never a GET, never without the Origin check (FR-CHAT-070 · NFR-SEC-040)
+export async function DELETE(request: Request, { params }: Context) {
+  if (!isAllowedOrigin(request)) return failure("forbidden", 403);
+  const { id } = await params;
+  if (!isValidId(id)) return failure("รหัสแชตไม่ถูกต้อง", 400);
+  try {
+    await deleteChat(createStore(), id);
+    return new Response(null, { status: 204 });
+  } catch (error) {
+    return storageFailure(error, "ลบแชตไม่สำเร็จ ลองอีกครั้ง");
   }
 }
