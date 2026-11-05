@@ -1,11 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AiNoticeDialog } from "./ai-notice-dialog";
 import { ChatActions } from "./chat-actions";
 import { ChatList } from "./chat-list";
+import { acknowledgeAiNotice, hasAcknowledgedAiNotice } from "../consent/ai-notice-flag";
 import { ChatPane, type ChatMessage } from "./chat-pane";
 import type { ChatListItem } from "./group-chats";
+import { AiWaitTimeout, postMessage } from "./post-message";
 import { stageOf, type ChatStage } from "./quick-chips";
+
+const SEND_FAILED = "ส่งข้อความไม่สำเร็จ ลองอีกครั้ง";
+// the draft may have changed on the server by now, so this text must not say it is unchanged (mockup #s-err-ai says so only for the server's own "AI unreachable" notice)
+const AI_TIMED_OUT = "ยังไม่ได้รับคำตอบจาก AI ตรวจร่างบิลก่อนสั่งต่อ แล้วลองส่งอีกครั้งได้";
+const CONSENT_SAVE_LIMIT_MS = 10_000; // a hung request must not keep the notice locked: cancel and accept are off while saving
+const NOTICE_SAVE_FAILED = "บันทึกการรับทราบไม่สำเร็จ ลองอีกครั้ง";
 
 export function ChatShell() {
   const [chats, setChats] = useState<ChatListItem[]>([]);
@@ -15,7 +24,11 @@ export function ChatShell() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
   const [stage, setStage] = useState<ChatStage>("no-shop");
-  const [hasSendError, setHasSendError] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [isNoticeOpen, setIsNoticeOpen] = useState(false);
+  const [isNoticeSaving, setIsNoticeSaving] = useState(false);
+  const [noticeError, setNoticeError] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const newChatRef = useRef<HTMLButtonElement>(null);
@@ -56,7 +69,8 @@ export function ChatShell() {
     setStage(shownStage);
     setText("");
     setOpenError(null);
-    setHasSendError(false);
+    setSendError(null);
+    setIsSending(false); // the waiting status belongs to the chat the message was sent from
     setIsDrawerOpen(false);
   }
 
@@ -100,28 +114,61 @@ export function ChatShell() {
     }
   }
 
+  // the box is cleared and the user's bubble shows at once; if sending fails both are put back
   async function sendMessage() {
     const sentText = text;
+    const shown = activeId ? messages : [];
     setIsBusy(true);
-    setHasSendError(false);
+    setIsSending(true);
+    setSendError(null);
+    let ticket = latestOpen.current;
     try {
       const chatId = activeId ?? (await createChat());
-      const res = await fetch(`/api/chats/${chatId}/messages`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: sentText }),
-      });
-      if (!res.ok) throw new Error("send failed");
-      const { chat, message } = await res.json();
-      putOnTop(chat);
-      setMessages((current) => [...current, message]);
-      setText((current) => (current === sentText ? "" : current)); // keep what was typed while sending
-    } catch {
-      setText((current) => current || sentText); // creating the chat cleared the box; give the text back
-      setHasSendError(true);
+      ticket = latestOpen.current;
+      setMessages([...shown, { role: "user", text: sentText }]);
+      setText("");
+      const answer = await postMessage(chatId, sentText);
+      putOnTop(answer.chat); // the reply is stored on the server; opening that chat again shows it
+      if (ticket !== latestOpen.current) return;
+      setMessages([...shown, ...answer.messages, ...answer.notices.map((notice) => ({ role: "notice", text: notice }))]);
+    } catch (error) {
+      if (ticket !== latestOpen.current) return; // the user is on another chat now; its screen is not ours to change
+      setMessages(shown);
+      setText((current) => current || sentText);
+      setSendError(error instanceof AiWaitTimeout ? AI_TIMED_OUT : SEND_FAILED);
     } finally {
+      setIsSending(false);
       setIsBusy(false);
     }
+  }
+
+  // nothing leaves this machine for the AI before the user has seen the notice (NFR-PDPA-030)
+  function requestSend() {
+    if (hasAcknowledgedAiNotice()) void sendMessage();
+    else {
+      setNoticeError(null);
+      setIsNoticeOpen(true);
+    }
+  }
+
+  async function acceptNotice() {
+    setIsNoticeSaving(true);
+    setNoticeError(null);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CONSENT_SAVE_LIMIT_MS);
+    try {
+      const res = await fetch("/api/consent", { method: "POST", signal: controller.signal });
+      if (!res.ok) throw new Error("consent failed");
+    } catch {
+      setNoticeError(NOTICE_SAVE_FAILED);
+      return;
+    } finally {
+      clearTimeout(timer);
+      setIsNoticeSaving(false);
+    }
+    acknowledgeAiNotice();
+    setIsNoticeOpen(false);
+    void sendMessage();
   }
 
   const active = chats.find((chat) => chat.id === activeId);
@@ -130,7 +177,8 @@ export function ChatShell() {
     <div className="h-screen bg-desk p-0 lg:p-2.5">
       <div className="relative grid h-full overflow-hidden bg-white lg:grid-cols-[288px_minmax(440px,1.1fr)_minmax(360px,560px)] lg:rounded-2xl lg:border lg:border-line lg:shadow-sm">
         <ChatList chats={chats} activeId={activeId} now={new Date()} isBusy={isBusy} isDrawerOpen={isDrawerOpen} hasListError={hasListError} hasCreateError={hasCreateError} newChatRef={newChatRef} onNewChat={startNewChat} onOpen={openChat} />
-        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} hasSendError={hasSendError} openError={openError} menuRef={menuRef} actions={active && <ChatActions chat={active} isDisabled={isBusy} onRenamed={putOnTop} onDeleted={removeChat} />} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={sendMessage} />
+        <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} isSending={isSending} sendError={sendError} openError={openError} menuRef={menuRef} actions={active && <ChatActions chat={active} isDisabled={isBusy} onRenamed={putOnTop} onDeleted={removeChat} />} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={requestSend} />
+        {isNoticeOpen && <AiNoticeDialog isSaving={isNoticeSaving} error={noticeError} onAccept={acceptNotice} onClose={() => !isNoticeSaving && setIsNoticeOpen(false)} />}
         {isDrawerOpen && <button type="button" aria-label="ปิดประวัติแชต" onClick={() => setIsDrawerOpen(false)} className="absolute inset-0 z-40 bg-black/40 lg:hidden" />}
         <section aria-label="ตัวอย่างบิล" className="hidden items-center justify-center border-l border-line bg-desk text-sm text-ink-3 lg:flex">
           ตัวอย่างบิลจะแสดงที่นี่

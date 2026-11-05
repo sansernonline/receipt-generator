@@ -20,7 +20,11 @@ export default defineConfig({
     reuseExistingServer: false,
     env: { BILLGEN_DATA_DIR: dataDir, NEXT_DIST_DIR: ".next-e2e" }, // own build folder, never shared with other dev servers
   },
-  use: { baseURL: `http://127.0.0.1:${port}` },
+  use: {
+    baseURL: `http://127.0.0.1:${port}`,
+    // the AI notice is shown once per browser; specs about other things start as a browser that has accepted it (consent specs reset this)
+    storageState: { cookies: [], origins: [{ origin: `http://127.0.0.1:${port}`, localStorage: [{ name: "billgen:ai-notice-acknowledged", value: "1" }] }] },
+  },
   projects: [
     { name: "chrome", use: { channel: "chrome" } },
     { name: "edge", use: { channel: "msedge" } },

@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { acknowledgeAiNotice } from "../consent/ai-notice-flag";
 import { ChatShell } from "./chat-shell";
 
 const HTML_TEXT = "<script>alert(1)</script> ร้านกาแฟ";
@@ -8,12 +9,13 @@ const sent = { ...created, title: HTML_TEXT, updatedAt: "2026-10-18T05:01:00Z" }
 const calls: string[] = [];
 
 beforeEach(() => {
+  acknowledgeAiNotice(); // these tests are about sending, not the first-time notice (chat-consent.unit.test.tsx)
   calls.length = 0;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
       calls.push(`${init?.method ?? "GET"} ${url}`);
-      if (url.endsWith("/messages")) return Response.json({ chat: sent, message: { role: "user", text: HTML_TEXT } }, { status: 201 });
+      if (url.endsWith("/messages")) return Response.json({ chat: sent, message: { role: "user", text: HTML_TEXT }, messages: [{ role: "user", text: HTML_TEXT }], notices: [] }, { status: 201 });
       if (init?.method === "POST") return Response.json({ chat: created }, { status: 201 });
       return Response.json({ chats: [] });
     }),
@@ -22,6 +24,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -89,7 +92,7 @@ test("text typed while a message is still sending stays in the box", async () =>
   await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3));
 
   fireEvent.change(screen.getByRole("textbox", { name: "ข้อความ" }), { target: { value: "พิมพ์ต่อ" } });
-  finish(Response.json({ chat: sent, message: { role: "user", text: "แรก" } }, { status: 201 }));
+  finish(Response.json({ chat: sent, message: { role: "user", text: "แรก" }, messages: [{ role: "user", text: "แรก" }], notices: [] }, { status: 201 }));
 
   await screen.findByText("แรก", { selector: "p" });
   expect(screen.getByRole("textbox", { name: "ข้อความ" })).toHaveValue("พิมพ์ต่อ");

@@ -34,5 +34,5 @@ test("[NFR-COMP-020] at 390 px the search box inside the history drawer filters 
   await page.getByRole("button", { name: "เปิดประวัติแชต" }).click();
   await page.getByRole("searchbox", { name: "ค้นหาแชต" }).fill("ไม่มีคำนี้เลยจริงๆ");
 
-  await expect(page.getByRole("status")).toContainText("ไม่พบแชตที่มี");
+  await expect(page.getByRole("status").filter({ hasText: "ไม่พบแชต" })).toContainText("ไม่พบแชตที่มี");
 });

@@ -44,6 +44,26 @@ describe("issueBlockers", () => {
   it("a line with neither price nor qty reports the price first, one reason per line", () => {
     expect(issueBlockers(withLine({ qty: null, unitPrice: null }))).toEqual(["บรรทัด 3 ยังไม่มีราคา ใส่ราคาก่อนออกบิล"]);
   });
+
+  it("[TC-TOT-038] a net of 0.00 blocks nothing", () => {
+    expect(issueBlockers(withDiscount(295))).toEqual([]);
+  });
+
+  it("[TC-TOT-038] a net of -0.01 gives one reason", () => {
+    expect(issueBlockers(withDiscount(295.01))).toEqual(["ยอดสุทธิติดลบ (-0.01 บาท) ลดส่วนลดก่อนจึงออกบิลได้"]);
+  });
+
+  it("several reasons at once list the lines by number first and the negative net last", () => {
+    const draft = withLine({ qty: 1, unitPrice: null });
+    draft.items[1] = { ...draft.items[1], qty: null };
+    const negative = { ...draft, footer: { ...draft.footer, discount: { kind: "amount" as const, value: 300 } } };
+
+    expect(issueBlockers(negative)).toEqual([
+      "บรรทัด 2 ยังไม่มีจำนวน ใส่จำนวนก่อนออกบิล",
+      "บรรทัด 3 ยังไม่มีราคา ใส่ราคาก่อนออกบิล",
+      expect.stringMatching(/^ยอดสุทธิติดลบ/),
+    ]);
+  });
 });
 
 describe("netNotices", () => {

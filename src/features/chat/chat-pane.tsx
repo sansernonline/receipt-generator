@@ -1,4 +1,5 @@
-import { useRef, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { MessageBubble } from "./message-bubble";
 import { chipsFor, type ChatStage } from "./quick-chips";
 
 export type ChatMessage = { role: string; text: string };
@@ -9,7 +10,8 @@ type Props = {
   text: string;
   stage: ChatStage;
   isBusy: boolean;
-  hasSendError: boolean;
+  isSending: boolean;
+  sendError: string | null;
   openError: string | null;
   menuRef: RefObject<HTMLButtonElement | null>;
   actions?: ReactNode;
@@ -19,7 +21,7 @@ type Props = {
   onSend: () => void;
 };
 
-export function ChatPane({ title, messages, text, stage, isBusy, hasSendError, openError, menuRef, actions, onOpenDrawer, onTextChange, onFillText, onSend }: Props) {
+export function ChatPane({ title, messages, text, stage, isBusy, isSending, sendError, openError, menuRef, actions, onOpenDrawer, onTextChange, onFillText, onSend }: Props) {
   const boxRef = useRef<HTMLTextAreaElement>(null);
 
   function fillBox(fillText: string) {
@@ -28,6 +30,13 @@ export function ChatPane({ title, messages, text, stage, isBusy, hasSendError, o
   }
 
   const canSend = !isBusy && text.trim() !== "";
+
+  // a closed box loses the focus; give it back when the wait ends so the user can keep typing
+  const wasSending = useRef(false);
+  useEffect(() => {
+    if (wasSending.current && !isSending) boxRef.current?.focus();
+    wasSending.current = isSending;
+  }, [isSending]);
 
   // Enter sends, Shift+Enter is a new line; Enter that confirms a Thai/IME word must not send (mockup #s-chat)
   function sendOnEnter(event: KeyboardEvent) {
@@ -38,7 +47,7 @@ export function ChatPane({ title, messages, text, stage, isBusy, hasSendError, o
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    onSend();
+    if (canSend) onSend();
   }
 
   return (
@@ -60,10 +69,20 @@ export function ChatPane({ title, messages, text, stage, isBusy, hasSendError, o
         )}
         {messages.length === 0 && !openError && <p className="text-ink-3">พิมพ์ข้อมูลร้านและรายการสินค้าเพื่อเริ่มออกบิล</p>}
         {messages.map((message, index) => (
-          <p key={index} className="max-w-[85%] self-end whitespace-pre-wrap break-words rounded-2xl bg-accent-fill px-3 py-2 text-white">
-            {message.text}
-          </p>
+          <MessageBubble key={index} message={message} />
         ))}
+        <div role="status" className="self-start">
+          {isSending && (
+            <div className="flex items-center gap-2 py-1 text-ink-3">
+              <span aria-hidden="true" className="flex gap-1">
+                {[0, 150, 300].map((delay) => (
+                  <i key={delay} style={{ animationDelay: `${delay}ms` }} className="size-1.5 animate-pulse rounded-full bg-ink-3 motion-reduce:animate-none" />
+                ))}
+              </span>
+              <span>กำลังทำ…</span>
+            </div>
+          )}
+        </div>
       </section>
       <div className="p-3">
         <div role="group" aria-label="คำสั่งด่วน" className="mb-2 flex gap-2 overflow-x-auto lg:flex-wrap">
@@ -80,9 +99,9 @@ export function ChatPane({ title, messages, text, stage, isBusy, hasSendError, o
             </button>
           ))}
         </div>
-        {hasSendError && (
+        {sendError && (
           <p role="alert" className="mb-2 px-2 text-xs text-accent">
-            ส่งข้อความไม่สำเร็จ ลองอีกครั้ง
+            {sendError}
           </p>
         )}
         <form onSubmit={submit} className="flex items-end gap-2 rounded-[22px] border border-line-2 p-2">
@@ -91,9 +110,10 @@ export function ChatPane({ title, messages, text, stage, isBusy, hasSendError, o
             aria-label="ข้อความ"
             rows={1}
             value={text}
+            disabled={isSending}
             onChange={(event) => onTextChange(event.target.value)}
             onKeyDown={sendOnEnter}
-            placeholder="พิมพ์รายการ เช่น ชาไทย 1 แก้ว 50 หรือสั่งแก้ใบเสร็จ"
+            placeholder={isSending ? "กำลังทำ… รอผลก่อนส่งข้อความถัดไป" : "พิมพ์รายการ เช่น ชาไทย 1 แก้ว 50 หรือสั่งแก้ใบเสร็จ"}
             className="min-h-9 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none"
           />
           <button type="submit" disabled={!canSend} aria-label="ส่ง" className="size-9 rounded-full bg-accent-fill text-white disabled:opacity-40">

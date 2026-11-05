@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 type Props = { title: string; footer: ReactNode; onClose: () => void; children: ReactNode };
 
@@ -9,6 +9,15 @@ export function DialogFrame({ title, footer, onClose, children }: Props) {
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [onClose]);
+
+  // keyboard users land back where they were when the dialog closes; read while rendering, before autoFocus moves it
+  const [opener] = useState(() => document.activeElement);
+  useEffect(
+    () => () => {
+      if (opener instanceof HTMLElement) opener.focus();
+    },
+    [opener],
+  );
 
   return (
     <div onClick={(event) => event.target === event.currentTarget && onClose()} className="fixed inset-0 z-[60] grid place-items-center bg-black/40 p-4">
