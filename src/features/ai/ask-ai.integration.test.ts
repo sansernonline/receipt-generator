@@ -1,26 +1,18 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { type AiStub, reply, startAiStub } from "../../../test/ai-stub/ai-stub";
 import { askAi } from "./ask-ai";
-import type { AiConfig, AiLogEntry, AskAiInput } from "./types";
+import { KEY, addWater, input, okBody, useAiStub } from "./test-kit";
 
-const KEY = "TESTKEY-0123456789";
-const draft = { items: [{ line: 1, name: "กาแฟเย็น" }, { line: 2, name: "ชาเย็น" }] };
-const input = (userText = "เพิ่มน้ำเปล่า 1 ขวด 10"): AskAiInput => ({ chatId: "chat-1", userText, draft });
-const addWater = { op: "add_item", name: "น้ำเปล่า", qty: 1, unit: "ขวด", unit_price: 10, code: null, description: null };
-const okBody = (over: Record<string, unknown> = {}) => ({ status: "ok", reason: null, action: null, operations: [addWater], question: null, reply: "เพิ่มน้ำเปล่าแล้ว", ...over });
 const invalid = reply(okBody({ operations: [{ ...addWater, qty: "สาม" }] }));
 const RETRY_HEADING = "ผลครั้งก่อนไม่ผ่านการตรวจรูปแบบ";
 
+const { state, configFor, ask } = useAiStub();
 let stub: AiStub;
-let logs: AiLogEntry[];
-const configFor = (over: Partial<AiConfig> = {}): AiConfig => ({ baseUrl: stub.baseUrl, apiKey: KEY, modelText: "m-text", modelOcr: "typhoon-ocr", maxTokens: 8192, timeoutMs: 60_000, ...over });
-const ask = (i: AskAiInput = input(), config = configFor()) => askAi(i, { config, log: (e) => logs.push(e) });
-
-beforeEach(async () => {
-  stub = await startAiStub();
-  logs = [];
+let logs: typeof state.logs;
+beforeEach(() => {
+  stub = state.stub;
+  logs = state.logs;
 });
-afterEach(() => stub.close());
 
 describe("askAi: validate, retry once, keep the draft", () => {
   it("[TC-AI-002][TC-AI-006] uses a correct reply and calls the AI once", async () => {
@@ -97,17 +89,17 @@ describe("askAi: validate, retry once, keep the draft", () => {
   it("[TC-AI-008] no answer within the wait time: unreachable message (scaled: 150 ms stands for 60 s)", async () => {
     stub.script("text", { hang: true });
 
-    const result = await ask(input(), configFor({ timeoutMs: 150 }));
+    const result = await ask(input(), { config: configFor({ timeoutMs: 150 }) });
 
     expect(result).toMatchObject({ ok: false, code: "ai_unreachable" });
   });
 
   it("[TC-AI-009] an answer just inside the wait time is used, one after it is not (scaled 300 ms)", async () => {
     stub.script("text", { ...reply(okBody()), delayMs: 150 });
-    expect(await ask(input(), configFor({ timeoutMs: 600 }))).toMatchObject({ ok: true });
+    expect(await ask(input(), { config: configFor({ timeoutMs: 600 }) })).toMatchObject({ ok: true });
 
     stub.script("text", { ...reply(okBody()), delayMs: 900 });
-    expect(await ask(input(), configFor({ timeoutMs: 600 }))).toMatchObject({ ok: false, code: "ai_unreachable" });
+    expect(await ask(input(), { config: configFor({ timeoutMs: 600 }) })).toMatchObject({ ok: false, code: "ai_unreachable" });
   });
 
   it("a clarify answer comes back as the question with no operations", async () => {
@@ -147,7 +139,7 @@ describe("askAi: request shape and call log", () => {
     const other = await startAiStub();
     other.script("text", reply(okBody()));
 
-    await ask(input(), configFor({ baseUrl: other.baseUrl, modelText: "other-model" }));
+    await ask(input(), { config: configFor({ baseUrl: other.baseUrl, modelText: "other-model" }) });
 
     expect(other.requests[0].model).toBe("other-model");
     expect(stub.requests).toHaveLength(0);

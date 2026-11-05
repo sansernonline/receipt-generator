@@ -1,4 +1,5 @@
-import type { AiConfig } from "./types";
+import { OCR_INSTRUCTION } from "./prompts";
+import type { AiConfig, ImageInput } from "./types";
 
 // What failed, never why in detail: status text, body and address stay out of anything a user can see.
 export type AiFailure = "timeout" | "rate_limited" | "server_error" | "network_error" | "bad_response";
@@ -20,6 +21,15 @@ export async function complete(config: AiConfig, request: CompletionRequest, fet
   if (response.status === 429) throw new AiCallError("rate_limited");
   if (!response.ok) throw new AiCallError("server_error");
   return contentOf(await readBounded(response));
+}
+
+const OCR_MAX_TOKENS = 4096;
+
+/** Reads the text of one picture with the OCR model. The picture goes out as a data URL. */
+export function ocrPage(config: AiConfig, image: ImageInput, fetchFn?: typeof fetch): Promise<string> {
+  const url = `data:${image.mimeType};base64,${Buffer.from(image.data).toString("base64")}`;
+  const content = [{ type: "text", text: OCR_INSTRUCTION }, { type: "image_url", image_url: { url } }];
+  return complete(config, { model: config.modelOcr, maxTokens: OCR_MAX_TOKENS, messages: [{ role: "user", content }] }, fetchFn);
 }
 
 async function send(config: AiConfig, request: CompletionRequest, fetchFn: typeof fetch) {
