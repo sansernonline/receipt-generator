@@ -1,9 +1,11 @@
+import { MAX_MESSAGE_CHARS } from "@/features/chat/messages";
+import { countChars } from "@/features/chat/chat-title";
 import { LogContext, logLeak, logged } from "./call-log";
 import { OUTPUT_TOKENS, inputBudgetChars, splitForBudget } from "./chunk-text";
 import { AiCallError, complete, ocrPage } from "./connector";
 import { hasLeak } from "./leak";
 import { refusalMessage } from "./refusals";
-import { MESSAGE_AI_UNREACHABLE, MESSAGE_INTERNAL_INFO, MESSAGE_INVALID_REPLY } from "./messages";
+import { MESSAGE_AI_UNREACHABLE, MESSAGE_INTERNAL_INFO, MESSAGE_INVALID_REPLY, MESSAGE_TOO_LONG } from "./messages";
 import {
   DEFAULT_IMAGE_REQUEST, PROMPT_ID, PROMPT_VERSION, SERVER_CANARY,
   bangkokDate, buildRetryMessage, buildSystem, buildUserMessage, fitHistory,
@@ -27,6 +29,8 @@ class LeakDetected extends Error {}
  * on any failure the caller simply keeps it as it is.
  */
 export async function askAi(input: AskAiInput, deps: AskAiDeps): Promise<AskAiResult> {
+  // The chat route checks this too; kept here so no caller can reach the AI with a longer text (FR-AI-080)
+  if (countChars(input.userText) > MAX_MESSAGE_CHARS) return failed("message_too_long", MESSAGE_TOO_LONG);
   const ctx: Ctx = { ...deps, log: deps.log ?? defaultLog, now: deps.now ?? (() => new Date()), canary: deps.canary ?? SERVER_CANARY };
   try {
     const system = buildSystem(ctx.canary);
