@@ -3,14 +3,15 @@ import type { Discount } from "@/features/totals/types";
 import { countChars } from "@/features/chat/chat-title";
 import { isRealDate, todayInBangkok } from "@/features/thai-date/thai-date";
 import { totalsOf } from "./draft-totals";
-import { NOTICE_BAD_PAYMENT_METHOD, NOTICE_BAD_VALUE, NOTICE_HEADER_BY_BUTTON, NOTICE_NOT_SUPPORTED, NOTICE_REMARKS_TOO_LONG, NOTICE_TOO_MANY_OPERATIONS, NOTICE_TOTAL_IS_COMPUTED } from "./notices";
-import { parseDate } from "./parse-draft";
+import { NOTICE_BAD_PAYMENT_METHOD, NOTICE_BAD_VALUE, NOTICE_HEADER_BY_BUTTON, NOTICE_NOT_SUPPORTED, NOTICE_REMARKS_TOO_LONG, NOTICE_TOO_MANY_OPERATIONS, NOTICE_TOTAL_IS_COMPUTED, noticeTooManyItems } from "./notices";
+import { MAX_ITEMS, parseDate } from "./parse-draft";
 import type { BillInfo, DateParts, Draft, DraftItem, PaymentMethod } from "./types";
 
 export type ApplyResult = { draft: Draft; isApplied: boolean; notices: string[] };
 type Handler = (draft: Draft, op: Operation) => Draft | null; // null = a value is not usable
 
-const MAX_OPERATIONS = 50; // simple: self-set ceiling for one message, the SRS gives none
+// simple: self-set ceiling for one message, the SRS gives none. Above MAX_ITEMS on purpose: a list of 205 lines must be told "5 over", not "too many commands"
+const MAX_OPERATIONS = MAX_ITEMS * 2;
 const MAX_TEXT = 500;
 const MAX_REMARKS = 500; // visible characters, FR-TOT-090
 const MAX_MONEY = 1e9;
@@ -197,5 +198,6 @@ export function applyOperations(before: Draft, operations: unknown[]): ApplyResu
     if (op.op === "remove_item") positions = afterRemoval(positions, (line as number) - 1);
     draft = next;
   }
+  if (draft.items.length > MAX_ITEMS) return refuse(before, noticeTooManyItems(draft.items.length - MAX_ITEMS));
   return canCalculate(draft) ? { draft, isApplied: true, notices: [] } : refuse(before, NOTICE_BAD_VALUE);
 }

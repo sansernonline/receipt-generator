@@ -1,6 +1,8 @@
 import { DEFAULT_VAT_RATE, type Discount, type VatSetting } from "@/features/totals/types";
 import type { BillInfo, DateParts, Draft, DraftItem, Footer, PaymentMethod } from "./types";
 
+export const MAX_ITEMS = 200; // FR-ITEM-100
+
 type Raw = Record<string, unknown>;
 
 const isRecord = (v: unknown): v is Raw => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -85,7 +87,7 @@ export function parseDraft(raw: unknown): Draft {
   const items = isRecord(raw) ? own(raw, "items") : undefined;
   if (!isRecord(raw) || !Array.isArray(items)) return emptyDraft();
   return {
-    items: items.map(parseItem).filter((item): item is DraftItem => item !== null),
+    items: items.map(parseItem).filter((item): item is DraftItem => item !== null).slice(0, MAX_ITEMS), // a damaged file with more is cut, not trusted
     bill: parseBill(own(raw, "bill")),
     footer: parseFooter(own(raw, "footer")),
   };
