@@ -1,13 +1,13 @@
 export type ChatStage = "no-shop" | "no-items" | "has-items";
 
-// fillText = the chip puts this text in the message box; no fillText = no behaviour yet, so the chip stays disabled
-export type QuickChip = { label: string; fillText?: string };
+// fillText = the chip puts this text in the message box; action "attach" = it opens the file picker; neither = no behaviour yet, so the chip stays disabled
+export type QuickChip = { label: string; fillText?: string; action?: "attach" };
 
 // wording follows the mockup chipsFor(); stage 2 and 3 wording is still รอยืนยัน (QS-07)
 // simple: the mockup's "เลือกหัวร้านที่บันทึกไว้" chip waits for saved shops (FR-HDR-090)
 const CHIPS: Record<ChatStage, QuickChip[]> = {
   "no-shop": [
-    { label: "ส่งรูปบิลตัวอย่าง" }, // waits for the attach button (FR-HDR-010 screen)
+    { label: "ส่งรูปบิลตัวอย่าง", action: "attach" },
     { label: "พิมพ์ข้อมูลร้าน", fillText: "ร้านกาแฟบ้านสวน 12/3 ถ.สุขุมวิท ชลบุรี โทร 038-123456 ออกบิลเงินสด" },
   ],
   "no-items": [

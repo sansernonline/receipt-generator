@@ -98,13 +98,13 @@ export function ChatPane({ title, messages, text, stage, isBusy, isSending, send
       </section>
       <div className="p-3">
         <div role="group" aria-label="คำสั่งด่วน" className="mb-2 flex gap-2 overflow-x-auto lg:flex-wrap">
-          {chipsFor(stage).map(({ label, fillText }) => (
+          {chipsFor(stage).map(({ label, fillText, action }) => (
             <button
               key={label}
               type="button"
-              disabled={fillText === undefined}
-              title={fillText === undefined ? "เร็วๆ นี้" : undefined}
-              onClick={() => fillText !== undefined && fillBox(fillText)}
+              disabled={action === "attach" ? !canAttach : fillText === undefined}
+              title={fillText === undefined && action === undefined ? "เร็วๆ นี้" : undefined}
+              onClick={() => (action === "attach" ? fileRef.current?.click() : fillText !== undefined && fillBox(fillText))}
               className="h-8 shrink-0 whitespace-nowrap rounded-full border border-line-2 px-3 text-xs hover:border-accent enabled:hover:bg-surface-2 disabled:opacity-50"
             >
               {label}

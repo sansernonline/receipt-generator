@@ -13,8 +13,8 @@ afterEach(() => {
 const STAGES: ChatStage[] = ["no-shop", "no-items", "has-items"];
 const FIRST_STAGE_CHIP = "ส่งรูปบิลตัวอย่าง";
 
-function renderPane(stage: ChatStage, onFillText = vi.fn()) {
-  render(<ChatPane title="แชตใหม่" messages={[]} text="" stage={stage} isBusy={false} isSending={false} sendError={null} openError={null} menuRef={createRef()} onOpenDrawer={() => undefined} onTextChange={() => undefined} onFillText={onFillText} onSend={() => undefined} canAttach={false} onAttach={() => undefined} />);
+function renderPane(stage: ChatStage, onFillText = vi.fn(), canAttach = false) {
+  render(<ChatPane title="แชตใหม่" messages={[]} text="" stage={stage} isBusy={false} isSending={false} sendError={null} openError={null} menuRef={createRef()} onOpenDrawer={() => undefined} onTextChange={() => undefined} onFillText={onFillText} onSend={() => undefined} canAttach={canAttach} onAttach={() => undefined} />);
   return within(screen.getByRole("group", { name: "คำสั่งด่วน" }));
 }
 const chipLabels = (stage: ChatStage) => {
@@ -51,7 +51,7 @@ test("a chip that fills the message box calls onFillText with its example text a
   expect(onFillText).toHaveBeenCalledWith("กาแฟเย็น 3 แก้ว 55, ครัวซองต์ 2 ชิ้น 65");
 });
 
-test.each([["no-shop", FIRST_STAGE_CHIP], ["no-items", "ส่งรูปรายการ"], ["has-items", "ลดท้ายบิล 10%"], ["has-items", "VAT แยกนอก"]] as const)(
+test.each([["no-items", "ส่งรูปรายการ"], ["has-items", "ลดท้ายบิล 10%"], ["has-items", "VAT แยกนอก"]] as const)(
   "the %s chip %s has no behaviour yet, so it stays disabled",
   (stage, label) => {
     const chips = renderPane(stage);
@@ -120,4 +120,20 @@ test("a disabled chip says it is coming soon; an enabled chip has no such toolti
 
   expect(chips.getByRole("button", { name: "ส่งรูปรายการ" })).toHaveAttribute("title", "เร็วๆ นี้");
   expect(chips.getByRole("button", { name: "พิมพ์รายการตัวอย่าง" })).not.toHaveAttribute("title");
+});
+
+test("the chip ส่งรูปบิลตัวอย่าง opens the file picker like the attach button when attaching is allowed", () => {
+  const chips = renderPane("no-shop", vi.fn(), true);
+  const picker = screen.getByLabelText("เลือกไฟล์รูป") as HTMLInputElement;
+  const open = vi.spyOn(picker, "click");
+
+  fireEvent.click(chips.getByRole("button", { name: FIRST_STAGE_CHIP }));
+
+  expect(open).toHaveBeenCalledOnce();
+});
+
+test("the chip ส่งรูปบิลตัวอย่าง is off while attaching is not allowed", () => {
+  const chips = renderPane("no-shop", vi.fn(), false);
+
+  expect(chips.getByRole("button", { name: FIRST_STAGE_CHIP })).toBeDisabled();
 });

@@ -7,7 +7,7 @@ import type { BillData } from "./types";
 const LOAD_FAILED = "โหลดตัวอย่างบิลไม่ได้ ลองเปิดแชตอีกครั้ง";
 const NOT_ISSUED = "ยังไม่ออกบิล";
 
-type Props = { bill: BillData | null; hasError?: boolean; isUndoBlocked?: boolean; onUndo?: () => void; className?: string };
+type Props = { bill: BillData | null; hasError?: boolean; isUndoBlocked?: boolean; undoNote?: string; onUndo?: () => void; className?: string };
 
 function EmptyState() {
   return (
@@ -24,7 +24,7 @@ function EmptyState() {
 }
 
 /** The bill beside the chat: the paper shows only the bill; the status sits above it, outside the paper (FR-DOC-120). */
-export function BillPreview({ bill, hasError = false, isUndoBlocked = false, onUndo, className = "" }: Props) {
+export function BillPreview({ bill, hasError = false, isUndoBlocked = false, undoNote = "", onUndo, className = "" }: Props) {
   const [pickedId, setPickedId] = useState<TemplateId>(DEFAULT_TEMPLATE);
   const shop = bill?.shop ?? null;
   const templateId = shop?.template ?? pickedId; // the confirmed shop header decides the template; the picker is only for a chat without one
@@ -55,6 +55,7 @@ export function BillPreview({ bill, hasError = false, isUndoBlocked = false, onU
         )}
       </header>
       <div aria-live="polite" className="px-4 empty:px-0">
+        {undoNote && <span className="sr-only">{undoNote}</span>}
         {status && <span className={`inline-block rounded-full border px-3 py-0.5 text-xs ${hasBill ? "border-line-2 text-ink-2" : "border-accent text-accent"}`}>{status}</span>}
       </div>
       <div className="flex min-h-0 flex-1 overflow-auto px-2 pb-4 pt-3">

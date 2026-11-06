@@ -23,6 +23,7 @@ const SEND_FAILED = "ส่งข้อความไม่สำเร็จ �
 const AI_TIMED_OUT = "ยังไม่ได้รับคำตอบจาก AI ตรวจร่างบิลก่อนสั่งต่อ แล้วลองส่งอีกครั้งได้";
 const CONSENT_SAVE_LIMIT_MS = 10_000; // a hung request must not keep the notice locked: cancel and accept are off while saving
 const NOTICE_SAVE_FAILED = "บันทึกการรับทราบไม่สำเร็จ ลองอีกครั้ง";
+const UNDONE = "ย้อนกลับแล้ว";
 const UNDO_FAILED = "ย้อนกลับไม่สำเร็จ ลองอีกครั้ง";
 const PICTURE_SENT = "ส่งรูปบิลตัวอย่าง"; // what the server stores for the turn (send-shop-image.ts)
 const SHOP_USED = "ใช้หัวบิลนี้แล้ว พิมพ์รายการสินค้าต่อได้เลย";
@@ -45,6 +46,8 @@ export function ChatShell() {
   const [bill, setBill] = useState<BillData | null>(null);
   // the AI proposal waiting for the user, with the typed text to send again after the shop is set (when it held items too); not stored, so both are gone when the chat is closed
   const [shopCard, setShopCard] = useState<{ fields: ShopProposal; followUp: string | null; ticket: number; sample?: string } | null>(null); // ticket = which open chat the card belongs to; sample = object URL of the picture the card was read from
+  const [isUndoing, setIsUndoing] = useState(false);
+  const [undoNote, setUndoNote] = useState(""); // said aloud to screen readers by the bill preview
   const [hasBillError, setHasBillError] = useState(false);
   const [isBillTab, setIsBillTab] = useState(false); // phone only: one of chat / bill fills the screen
   const newChatRef = useRef<HTMLButtonElement>(null);
@@ -93,6 +96,8 @@ export function ChatShell() {
     setSendError(null);
     setIsSending(false); // the waiting status belongs to the chat the message was sent from
     setBill(null);
+    setIsUndoing(false);
+    setUndoNote("");
     setShopCard(null);
     setHasBillError(false);
     setIsDrawerOpen(false);
@@ -151,15 +156,22 @@ export function ChatShell() {
   }
 
   // the server puts the draft back one edit and answers with the bill it now has (FR-ITEM-120)
+  // one undo at a time: a second press while the first waits would take back a second edit
   async function undoEdit() {
-    if (!activeId) return;
+    if (!activeId || isUndoing) return;
     const ticket = latestOpen.current;
+    setIsUndoing(true);
+    setUndoNote("");
     const res = await fetch(`/api/chats/${activeId}/undo`, { method: "POST" }).catch(() => null);
     const undone = res?.ok ? parseBill(await res.json().catch(() => null)) : null;
-    if (ticket !== latestOpen.current) return;
-    if (!undone) return setSendError(UNDO_FAILED);
-    setBill(undone);
-    setStage(undone.draft.items.length ? "has-items" : "no-items");
+    if (ticket === latestOpen.current) {
+      if (undone) {
+        setBill(undone);
+        setStage(undone.draft.items.length ? "has-items" : "no-items");
+        setUndoNote(UNDONE);
+      } else setSendError(UNDO_FAILED);
+    }
+    setIsUndoing(false);
   }
 
   // the server's answer to a message or a picture; a new card replaces the old one, an answer with no shop info keeps it
@@ -285,7 +297,7 @@ export function ChatShell() {
         <ChatPane title={active?.title ?? "แชตใหม่"} messages={messages} text={text} stage={stage} isBusy={isBusy} isSending={isSending} sendError={sendError} openError={openError} menuRef={menuRef} actions={active && <ChatActions chat={active} isDisabled={isBusy} onRenamed={putOnTop} onDeleted={removeChat} />} card={shopCard && activeId && <ShopCard key={JSON.stringify(shopCard)} card={shopCard.fields} sample={shopCard.sample} hasFollowUp={shopCard.followUp !== null} chatId={activeId} onUsed={(shopBill) => showShopUsed(shopBill, shopCard.followUp, shopCard.ticket)} />} onOpenDrawer={() => setIsDrawerOpen(true)} onTextChange={setText} onFillText={setText} onSend={requestSend} canAttach={stage === "no-shop" && !isBusy} onAttach={(file) => void attachPicture(file)} isHiddenOnMobile={isBillTab} />
         {isNoticeOpen && <AiNoticeDialog isSaving={isNoticeSaving} error={noticeError} onAccept={acceptNotice} onClose={closeNotice} />}
         {isDrawerOpen && <button type="button" aria-label="ปิดประวัติแชต" onClick={() => setIsDrawerOpen(false)} className="absolute inset-0 z-40 bg-black/40 lg:hidden" />}
-        <BillPreview bill={bill} hasError={hasBillError} isUndoBlocked={isBusy} onUndo={() => void undoEdit()} className={isBillTab ? "" : "max-lg:hidden"} />
+        <BillPreview bill={bill} hasError={hasBillError} isUndoBlocked={isBusy || isUndoing} undoNote={undoNote} onUndo={() => void undoEdit()} className={isBillTab ? "" : "max-lg:hidden"} />
         <nav aria-label="สลับมุมมอง" className="grid grid-cols-2 border-t border-line bg-white lg:hidden">
           {[{ label: "แชต", isBill: false }, { label: "บิล", isBill: true }].map(({ label, isBill }) => (
             <button key={label} type="button" aria-pressed={isBillTab === isBill} onClick={() => setIsBillTab(isBill)} className="min-h-11 font-semibold text-ink-2 aria-pressed:text-ink aria-pressed:shadow-[inset_0_-2px_0_var(--color-ink)]">
