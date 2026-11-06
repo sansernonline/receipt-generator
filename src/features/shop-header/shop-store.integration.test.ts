@@ -39,4 +39,15 @@ describe("shop store with a file system that fails", () => {
     expect(await fsp.readdir(path.join(dir, "shops"))).toEqual([]);
     expect(await readShop(createStore(dir), chatId)).toBeNull();
   });
+
+  test("[review] a shop that cannot be saved leaves the draft's tax mode as it was", async () => {
+    const draftFile = path.join(dir, "chats", chatId, "draft.json");
+    const before = await fsp.readFile(draftFile, "utf8");
+    let renames = 0;
+    const failing = createStore(dir, { ...fsp, rename: ((from: string, to: string) => (++renames === 2 ? Promise.reject(fail("EACCES")) : fsp.rename(from, to))) as typeof fsp.rename });
+
+    await expect(confirmShop(failing, chatId, cashShop, { vatMode: "exclusive" })).rejects.toMatchObject({ code: "EACCES" });
+
+    expect(await fsp.readFile(draftFile, "utf8")).toBe(before);
+  });
 });

@@ -58,7 +58,6 @@ export function confirmShop(store: Store, chatId: string, fields: ShopFields, { 
   return store.withChatLock(chatId, async () => {
     const chat = await store.readJson<StoredChat>(chatFile(store, chatId));
     if (await loadShop(store, chat.shopId)) throw new ShopLockedError();
-    await startDraftVat(store, chatId, vatMode);
     const shop: ShopHeader = { id: store.newId(), ...fields };
     const updated = { ...chat, shopId: shop.id };
     try {
@@ -69,6 +68,7 @@ export function confirmShop(store: Store, chatId: string, fields: ShopFields, { 
       await fsp.rm(store.shopDir(shop.id), { recursive: true, force: true }).catch(() => undefined); // best effort: no orphan file
       throw error;
     }
+    await startDraftVat(store, chatId, vatMode); // after the chat points to the shop: a failed save leaves the draft as it was
     await store.upsertIndex(updated);
     return logo ? { ...shop, logo: `${LOGO_PREFIX}${logo.toString("base64")}` } : shop;
   });
