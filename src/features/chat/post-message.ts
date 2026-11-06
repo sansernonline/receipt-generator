@@ -23,9 +23,10 @@ async function postAndWait(url: string, init: RequestInit): Promise<SendMessageR
 export const postMessage = (chatId: string, text: string) =>
   postAndWait(`/api/chats/${chatId}/messages`, { headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
 
-/** The sample bill picture. The browser sets the form's content type itself. */
-export function postPicture(chatId: string, file: File) {
+/** The sample bill picture, with the accent colour the browser found in it (null = none). The browser sets the form's content type itself. */
+export function postPicture(chatId: string, file: File, accent: string | null) {
   const form = new FormData();
   form.set("image", file);
+  if (accent) form.set("accent", accent);
   return postAndWait(`/api/chats/${chatId}/shop-image`, { body: form });
 }

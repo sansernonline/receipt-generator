@@ -9,6 +9,7 @@ import { BillPreview } from "../bill/bill-preview";
 import { fetchBill, parseBill } from "../bill/fetch-bill";
 import type { BillData } from "../bill/types";
 import type { SendMessageResponse } from "../draft/types";
+import { accentFromFile } from "../shop-header/accent-color";
 import { ShopCard } from "../shop-header/shop-card";
 import type { ShopProposal } from "../shop-header/types";
 import { attachProblem } from "../uploads/attach-problem";
@@ -196,7 +197,7 @@ export function ChatShell() {
     }
   }
 
-  // a sample bill picture: the server reads the header (FR-HDR-020); on failure the bubble is taken back
+  // a sample bill picture: the browser finds its main colour, the server reads the header (FR-HDR-020 · 040); on failure the bubble is taken back
   async function sendPicture(file: File) {
     const shown = activeId ? messages : [];
     setIsBusy(true);
@@ -208,7 +209,7 @@ export function ChatShell() {
       if (chatId === null) return;
       ticket = latestOpen.current;
       setMessages([...shown, { role: "user", text: PICTURE_SENT }]);
-      const answer = await postPicture(chatId, file);
+      const answer = await postPicture(chatId, file, await accentFromFile(file));
       showAnswer(answer, shown, ticket, null, answer.shopCard ? URL.createObjectURL(file) : undefined);
     } catch (error) {
       if (ticket !== latestOpen.current) return;

@@ -56,6 +56,24 @@ test("[FR-HDR-050] a card from a picture shows the sample picture to cut the log
   expect(screen.queryByRole("img", { name: "รูปบิลตัวอย่าง" })).toBeNull();
 });
 
+test("[FR-HDR-040] the accent from the picture is shown and sent with the card", async () => {
+  render(<Harness card={{ ...cashShop, accent: "#1f4e9c" }} sample="blob:sample" />);
+
+  expect(screen.getByText("สีเน้น #1f4e9c")).toBeInTheDocument();
+  use();
+
+  expect(await sent()).toMatchObject({ accent: "#1f4e9c" });
+});
+
+test("[FR-HDR-040] no accent found: nothing is shown and nothing is sent", async () => {
+  render(<Harness card={cashShop} sample="blob:sample" />);
+
+  expect(screen.queryByText(/สีเน้น/)).toBeNull();
+  use();
+
+  expect(await sent()).not.toHaveProperty("accent");
+});
+
 test("[FR-TOT-040] the tax mode the AI chose is selected, and the user's choice is what is sent", async () => {
   render(<Harness card={{ ...cashShop, vatMode: "exclusive" }} sample="blob:sample" />);
   const select = screen.getByRole("combobox", { name: "วิธีคิดภาษีเริ่มต้น" });

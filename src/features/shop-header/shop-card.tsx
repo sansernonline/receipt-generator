@@ -5,7 +5,7 @@ import { TEMPLATES, type TemplateId } from "@/features/bill/bill-templates";
 import type { BillData } from "@/features/bill/types";
 import { type FieldMessages, submitShop } from "./submit-shop";
 import type { ShopFields, ShopProposal } from "./types";
-import { checkShop, hasErrors } from "./validate-shop";
+import { checkShop, hasErrors, parseAccent } from "./validate-shop";
 import type { VatMode } from "@/features/totals/types";
 
 /* slop-ok: placeholder-label every input has a visible label from Field; the scan cannot see it through the spread props */
@@ -57,6 +57,7 @@ export function ShopCard({ card, hasFollowUp, chatId, sample, onUsed }: Props) {
   const problems = checkShop(shop);
   const errors: FieldMessages = pressCount ? { ...problems.errors, ...refused?.fields } : {};
   const unsure = (key: keyof ShopFields) => (card.uncertain?.includes(key) ? UNSURE : undefined);
+  const accent = parseAccent(card.accent);
   const edit = (key: TextKey) => (event: { target: { value: string } }) => setShop({ ...shop, [key]: event.target.value });
   const text = (key: TextKey, id: string, describedBy?: string) => ({
     id, value: shop[key], onChange: edit(key), "aria-invalid": !!errors[key], "aria-describedby": describedBy, autoComplete: "off", className: control,
@@ -120,6 +121,12 @@ export function ShopCard({ card, hasFollowUp, chatId, sample, onUsed }: Props) {
           <Field label="อีเมล" error={errors.email} warning={unsure("email")}>
             {({ id, describedBy }) => <input {...text("email", id, describedBy)} inputMode="email" />}
           </Field>
+          {accent && (
+            <p className="flex items-center gap-2 text-xs text-ink-2 sm:col-span-2">
+              <span aria-hidden="true" style={{ background: accent }} className="size-5 rounded-full border border-line-2" />
+              สีเน้น {accent}
+            </p>
+          )}
           {/* the picture is the user's own file (an object URL), so next/image has nothing to optimise */}
           {sample && <img src={sample} alt="รูปบิลตัวอย่าง" className="max-h-56 max-w-full rounded-[10px] border border-line sm:col-span-2" />}
         </div>

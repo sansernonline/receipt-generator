@@ -66,6 +66,16 @@ test("[TC-HDR-007] attaching a picture posts it as a form to the chat's shop-ima
   expect(within(screen.getByRole("region", { name: "บทสนทนา" })).getByText("ส่งรูปบิลตัวอย่าง")).toBeInTheDocument();
 });
 
+test("[TC-HDR-007] a picture the browser cannot read for its colour is still sent, with no accent", async () => {
+  acknowledgeAiNotice();
+  render(<ChatShell />);
+
+  await attach(png());
+
+  await waitFor(() => expect(server.pictures).toHaveLength(1));
+  expect(server.pictures[0].has("accent")).toBe(false);
+});
+
 test("[TC-HDR-055] an answer with only a Thai notice and no card shows the notice and no card", async () => {
   acknowledgeAiNotice();
   server.pictureAnswer = { ...answer, notices: ["เอกสารในรูปไม่ตรงกับแม่แบบที่มี BILLGEN ออกได้ 4 แบบ"] };

@@ -23,12 +23,13 @@ describe("a picture in a chat with no shop header (FR-HDR-020 · 030)", () => {
     stub().script("ocr", reply(OCR_TEXT));
     stub().script("text", reply(body));
   };
-  const send = () => sendShopImage(createStore(dataDir()), chatId(), { bytes: bluePng() }, { imageLimiter: createImageLimiter() });
+  const send = (accent?: string) => sendShopImage(createStore(dataDir()), chatId(), { bytes: bluePng(), accent }, { imageLimiter: createImageLimiter() });
   const postForm = (form: FormData, over: Record<string, string> = {}) =>
     POST(new Request("http://localhost/api/shop-image", { method: "POST", headers: { ...headers, ...over }, body: form }), { params: Promise.resolve({ id: chatId() }) });
-  const formOf = (bytes: Uint8Array) => {
+  const formOf = (bytes: Uint8Array, accent?: string) => {
     const form = new FormData();
     form.set("image", new File([bytes as BlobPart], "bill.png", { type: "image/png" }));
+    if (accent) form.set("accent", accent);
     return form;
   };
 
@@ -147,6 +148,18 @@ describe("a picture in a chat with no shop header (FR-HDR-020 · 030)", () => {
     expect(res.shopCard?.vatMode).toBe(expected);
   });
 
+  test("[FR-HDR-040] the colour the browser found goes on the card", async () => {
+    read();
+
+    expect((await send("#1f4e9c")).shopCard?.accent).toBe("#1f4e9c");
+  });
+
+  test("[FR-HDR-040] a colour that is not #rrggbb is dropped", async () => {
+    read();
+
+    expect((await send("red; background:url(x)")).shopCard?.accent).toBeUndefined();
+  });
+
   test("[FR-AI-020] a reply that breaks the schema twice gives no card, a Thai text, and two tries", async () => {
     read(shopImageReplyBody({}, { customer: "คุณสมชาย" }));
 
@@ -178,10 +191,10 @@ describe("a picture in a chat with no shop header (FR-HDR-020 · 030)", () => {
   test("[TC-HDR-007] the route takes the picture as a form and answers 201 with the card", async () => {
     read();
 
-    const res = await postForm(formOf(bluePng()));
+    const res = await postForm(formOf(bluePng(), "#1f4e9c"));
 
     expect(res.status).toBe(201);
-    expect((await res.json()).shopCard).toMatchObject({ shopName: "ร้านกาแฟบ้านสวน" });
+    expect((await res.json()).shopCard).toMatchObject({ shopName: "ร้านกาแฟบ้านสวน", accent: "#1f4e9c" });
   });
 
   test("[NFR-SEC] the route refuses another origin and reads nothing", async () => {

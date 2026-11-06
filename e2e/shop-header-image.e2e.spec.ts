@@ -8,22 +8,24 @@ const emptyBill = { customerName: null, customerAddress: null, customerTaxId: nu
 const footer = { vat: { mode: "none", rate: 7 }, discount: null, paymentMethod: null, paymentDate: null, paymentDetail: null, remarks: null };
 const totals = { lines: [], subtotal: 0, billDiscount: 0, afterDiscount: 0, priceBeforeTax: 0, vat: 0, net: 0 };
 
-// The AI is not reachable in e2e, so the server's answer to the picture is faked;
-// the picture, the shop save and the bill use the real browser and the real server.
-async function openCardFromPicture(page: Page): Promise<{ chatId: () => string }> {
+// The AI is not reachable in e2e, so the server's answer to the picture is faked (it echoes the accent the browser sent);
+// the picture, the colour finding, the crop, the shop save and the bill use the real browser and the real server.
+async function openCardFromPicture(page: Page): Promise<{ accent: () => string | null; chatId: () => string }> {
+  let accent: string | null = null;
   let chatId = "";
   await page.route(PICTURE_URL, (route) => {
     const id = (chatId = new URL(route.request().url()).pathname.split("/")[3]);
+    accent = /name="accent"\r\n\r\n(#[0-9a-f]{6})/.exec(route.request().postDataBuffer()?.toString("latin1") ?? "")?.[1] ?? null;
     const message = { role: "user", text: "ส่งรูปบิลตัวอย่าง", createdAt: "2026-10-18T05:00:00Z" };
     return route.fulfill({
       status: 201,
-      json: { chat: { id, title: "ส่งรูปบิลตัวอย่าง", updatedAt: "2026-10-18T05:00:00Z" }, message, messages: [message], draft: { items: [], bill: emptyBill, footer }, totals, shop: null, shopCard: card, notices: [] },
+      json: { chat: { id, title: "ส่งรูปบิลตัวอย่าง", updatedAt: "2026-10-18T05:00:00Z" }, message, messages: [message], draft: { items: [], bill: emptyBill, footer }, totals, shop: null, shopCard: { ...card, ...(accent ? { accent } : {}) }, notices: [] },
     });
   });
   await page.goto("/");
   await page.getByLabel("เลือกไฟล์รูป").setInputFiles({ name: "bill.png", mimeType: "image/png", buffer: bluePng(200) });
   await expect(page.getByRole("region", { name: "การ์ดหัวร้าน" })).toBeVisible();
-  return { chatId: () => chatId };
+  return { accent: () => accent, chatId: () => chatId };
 }
 
 const preview = (page: Page) => page.getByRole("region", { name: "ตัวอย่างบิล" });
@@ -31,6 +33,35 @@ const useButton = (page: Page) => page.getByRole("button", { name: "ใช้ห
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
+});
+
+test("[TC-HDR-016] the browser finds the blue of the picture's top band and the bill uses it", async ({ page }) => {
+  const sent = await openCardFromPicture(page);
+
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(sent.accent()!.slice(i, i + 2), 16));
+  expect(Math.abs(r - 0x1f) + Math.abs(g - 0x4e) + Math.abs(b - 0x9c)).toBeLessThanOrEqual(12);
+  await expect(page.getByText(`สีเน้น ${sent.accent()}`)).toBeVisible();
+  await useButton(page).click();
+  const paper = preview(page).getByRole("article", { name: "ใบเสร็จรับเงิน" });
+  await expect(paper).toBeVisible();
+  expect(await paper.evaluate((el) => (el as HTMLElement).style.getPropertyValue("--color-accent"))).toBe(sent.accent());
+});
+
+test("[TC-HDR-017] a file the browser cannot decode as a picture is sent, with no accent, and the card still comes", async ({ page }) => {
+  let accentField = true;
+  await page.route(PICTURE_URL, (route) => {
+    accentField = (route.request().postDataBuffer()?.toString("latin1") ?? "").includes('name="accent"');
+    const id = new URL(route.request().url()).pathname.split("/")[3];
+    const message = { role: "user", text: "ส่งรูปบิลตัวอย่าง", createdAt: "2026-10-18T05:00:00Z" };
+    return route.fulfill({ status: 201, json: { chat: { id, title: "x", updatedAt: "2026-10-18T05:00:00Z" }, message, messages: [message], draft: { items: [], bill: emptyBill, footer }, totals, shop: null, shopCard: card, notices: [] } });
+  });
+  await page.goto("/");
+  const damaged = Buffer.concat([bluePng(40).subarray(0, 60), Buffer.from("garbage after the header")]); // a PNG whose data is cut and broken
+
+  await page.getByLabel("เลือกไฟล์รูป").setInputFiles({ name: "bad.png", mimeType: "image/png", buffer: damaged });
+
+  await expect(page.getByRole("region", { name: "การ์ดหัวร้าน" })).toBeVisible();
+  expect(accentField).toBe(false);
 });
 
 test("[FR-TOT-040] the tax mode from the picture is chosen on the card and is the draft's tax mode once the card is used", async ({ page }) => {

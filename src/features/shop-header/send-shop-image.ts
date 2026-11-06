@@ -7,18 +7,19 @@ import { openDraft } from "@/features/draft/open-draft";
 import type { SendMessageResponse } from "@/features/draft/types";
 import type { Store } from "@/features/storage/store";
 import { saveOriginalImage } from "@/features/uploads/original-image";
+import { parseAccent } from "./validate-shop";
 
 export const IMAGE_MESSAGE_TEXT = "ส่งรูปบิลตัวอย่าง"; // the client's file name is never stored in the chat
 const MIME = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" } as const;
 
-export type ShopImageInput = { bytes: Uint8Array };
+export type ShopImageInput = { bytes: Uint8Array; accent?: unknown };
 
 /**
  * A sample bill picture in a chat with no shop header yet: keep the original with the chat (FR-HDR-150), read it (OCR then P-001)
  * and answer with a card to review. Nothing is saved as the shop: only the user's "ใช้หัวบิลนี้" does that (ADR-0006).
- * The bytes are the route's checked upload.
+ * The bytes are the route's checked upload; the accent is the colour the browser found in it (FR-HDR-040).
  */
-export async function sendShopImage(store: Store, chatId: string, { bytes }: ShopImageInput, deps: Partial<AskAiDeps> = {}): Promise<SendMessageResponse> {
+export async function sendShopImage(store: Store, chatId: string, { bytes, accent }: ShopImageInput, deps: Partial<AskAiDeps> = {}): Promise<SendMessageResponse> {
   const { chat, message } = await addUserMessage(store, chatId, IMAGE_MESSAGE_TEXT);
   const { type } = await saveOriginalImage(store, chatId, bytes);
   const config = loadAiConfig();
@@ -26,9 +27,10 @@ export async function sendShopImage(store: Store, chatId: string, { bytes }: Sho
   const turn = config.apiKey
     ? await askShopImage({ chatId, image: { mimeType: MIME[type], data: bytes } }, { config, ...deps })
     : ({ ok: false, code: "ai_unreachable", userMessage: MESSAGE_AI_UNREACHABLE } as const);
+  const color = parseAccent(accent);
   return {
     chat, message, messages: [message], ...(await openDraft(store, chatId)),
     notices: turn.ok ? [] : [turn.userMessage],
-    ...(turn.ok ? { shopCard: turn.card } : { error: turn.code }),
+    ...(turn.ok ? { shopCard: { ...turn.card, ...(color ? { accent: color } : {}) } } : { error: turn.code }),
   };
 }

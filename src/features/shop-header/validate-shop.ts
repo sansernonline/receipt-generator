@@ -24,6 +24,9 @@ export function checkShop(shop: ShopFields): ShopProblems {
   return problems;
 }
 
+/** A colour the browser sent: #rrggbb only, anything else is dropped (it ends up in a style on the bill). */
+export const parseAccent = (raw: unknown): string | undefined => (typeof raw === "string" && /^#[0-9a-f]{6}$/i.test(raw) ? raw.toLowerCase() : undefined);
+
 export const hasErrors = ({ errors }: ShopProblems) => Object.keys(errors).length > 0;
 
 /** The confirm request body (outside data): every field present with the right type, anything else dropped. null = not a shop. */
@@ -34,7 +37,8 @@ export function parseShopFields(raw: unknown): ShopFields | null {
   const template = TEMPLATES.find(({ id }) => id === read("template"))?.id;
   if (texts.some((value) => typeof value !== "string") || !template) return null;
   const [shopName, address, taxId, phone, email] = (texts as string[]).map((value) => value.trim());
-  return { shopName, address, taxId, phone, email, template };
+  const accent = parseAccent(read("accent"));
+  return { shopName, address, taxId, phone, email, template, ...(accent ? { accent } : {}) };
 }
 
 /** A stored or received shop header (shop.json, the server's answer): the fields as above plus its id. */

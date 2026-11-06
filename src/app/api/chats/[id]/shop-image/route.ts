@@ -23,7 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const store = createStore();
     if (await readShop(store, id)) return failure('แชตนี้มีหัวบิลแล้ว แก้ได้ที่ปุ่ม "แก้หัวบิล"', 409);
-    return Response.json(await sendShopImage(store, id, { bytes }), { status: 201 });
+    return Response.json(await sendShopImage(store, id, { bytes, accent: form?.get("accent") }), { status: 201 });
   } catch (error) {
     return storageFailure(error, "ส่งรูปไม่สำเร็จ ลองอีกครั้ง");
   }

@@ -2,8 +2,9 @@ import type { TemplateId } from "@/features/bill/bill-templates";
 import type { VatMode } from "@/features/totals/types";
 
 // The shop header of one chat (SRS 6.2). "" = not given. The document title is the template's name, so it is not stored.
+// accent = the colour taken from the sample picture (#rrggbb); absent = the template's own colour (FR-HDR-040)
 // simple: no branch, e-mail format, bill number format or look yet: the edit button and saved shops (row 38) bring them
-export type ShopFields = { shopName: string; address: string; taxId: string; phone: string; email: string; template: TemplateId };
+export type ShopFields = { shopName: string; address: string; taxId: string; phone: string; email: string; template: TemplateId; accent?: string };
 
 /** What the card shows and sends back: the fields plus two things that are not stored in shop.json. */
 export type ShopProposal = ShopFields & {
