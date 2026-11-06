@@ -84,7 +84,7 @@ test("[TC-HDR-019] a card with no logo cut shows no logo picture and no ไม�
   render(<Harness card={cashShop} sample="blob:sample" />);
 
   expect(screen.queryByRole("img", { name: "โลโก้ที่ตัดจากรูป" })).toBeNull();
-  expect(screen.queryByRole("button", { name: /โลโก้/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^(ไม่ใช้|ใช้)โลโก้$/ })).toBeNull();
 });
 
 test("[FR-HDR-050] a card from a picture shows the sample picture to cut the logo from; a card from text does not", () => {

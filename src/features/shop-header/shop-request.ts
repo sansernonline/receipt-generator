@@ -11,7 +11,7 @@ export type ShopRequest = { fields: ShopFields; vatMode?: VatMode; logo?: Buffer
 export type ShopRequestResult = { ok: true; value: ShopRequest } | { ok: false; error: string };
 
 const BAD_SHOP = "ข้อมูลหัวบิลไม่ถูกต้อง";
-const BAD_LOGO = "โลโก้ไม่ถูกต้อง";
+const BAD_LOGO = "โลโก้ไม่ถูกต้องหรือไฟล์ใหญ่เกิน 512 KB ลองครอบเฉพาะส่วนโลโก้ให้เล็กลง หรือกด “ไม่ใช้โลโก้”";
 
 // null = not a usable PNG. The text is checked before it is decoded, so a huge string never becomes a huge buffer.
 function decodeLogo(dataUrl: string): Buffer | null {

@@ -60,7 +60,7 @@ describe("the shop's colour and logo on POST /api/chats/[id]/shop (FR-HDR-040 ·
     const res = await post({ ...cashShop, logo });
 
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toBe("โลโก้ไม่ถูกต้อง");
+    expect((await res.json()).error).toContain("โลโก้ไม่ถูกต้อง");
     expect((await readChatFile()).shopId).toBeNull();
     await expect(fsp.readdir(path.join(dataDir(), "shops"))).rejects.toThrow();
   });
