@@ -88,7 +88,7 @@ export function ChatPane({ title, messages, text, stage, isBusy, isSending, send
             <div className="flex items-center gap-2 py-1 text-ink-3">
               <span aria-hidden="true" className="flex gap-1">
                 {[0, 150, 300].map((delay) => (
-                  <i key={delay} style={{ animationDelay: `${delay}ms` }} className="size-1.5 animate-pulse rounded-full bg-ink-3 motion-reduce:animate-none" />
+                  <i key={delay} style={{ animationDelay: `${delay}ms` }} className="size-1.5 animate-typing rounded-full bg-ink-3" />
                 ))}
               </span>
               <span>กำลังทำ…</span>

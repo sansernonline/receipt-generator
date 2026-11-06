@@ -21,7 +21,7 @@ export function DialogFrame({ title, footer, onClose, children }: Props) {
 
   return (
     <div onClick={(event) => event.target === event.currentTarget && onClose()} className="fixed inset-0 z-[60] grid place-items-center bg-black/40 p-4">
-      <div role="dialog" aria-modal="true" aria-label={title} className="w-full max-w-[420px] rounded-2xl bg-white p-5 shadow-xl">
+      <div role="dialog" aria-modal="true" aria-label={title} className="w-full max-w-[420px] animate-pop rounded-2xl bg-white p-5 shadow-xl">
         <h2 className="font-head text-base font-semibold">{title}</h2>
         <div className="mt-3 text-sm">{children}</div>
         <div className="mt-5 flex justify-end gap-2">{footer}</div>

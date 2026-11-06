@@ -24,7 +24,7 @@ export function ChatList({ chats, activeId, now, isBusy, isDrawerOpen, hasListEr
     <aside
       aria-label="ประวัติแชต"
       data-open={isDrawerOpen}
-      className="absolute inset-y-0 left-0 z-50 flex w-[280px] -translate-x-full flex-col border-r border-line bg-white shadow-xl transition-[transform,visibility] duration-200 max-lg:invisible data-[open=true]:visible data-[open=true]:translate-x-0 lg:static lg:w-auto lg:translate-x-0 lg:shadow-none"
+      className="absolute inset-y-0 left-0 z-50 flex w-[280px] -translate-x-full flex-col border-r border-line bg-white shadow-xl transition-[transform,visibility] duration-250 ease-in-out max-lg:invisible data-[open=true]:visible data-[open=true]:translate-x-0 lg:static lg:w-auto lg:translate-x-0 lg:shadow-none"
     >
       <div className="p-4 font-head text-base font-semibold tracking-wider">BILLGEN</div>
       <button

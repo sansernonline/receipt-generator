@@ -55,7 +55,7 @@ export function ChatActions({ chat, isDisabled, onRenamed, onDeleted }: Props) {
       {isMenuOpen && (
         <>
           <div aria-hidden="true" onClick={() => setIsMenuOpen(false)} className="fixed inset-0 z-30" />
-          <div role="menu" className="absolute right-0 top-10 z-40 w-48 overflow-hidden rounded-xl border border-line bg-white py-1 shadow-lg">
+          <div role="menu" className="absolute right-0 top-10 z-40 w-48 animate-pop-fast overflow-hidden rounded-xl border border-line bg-white py-1 shadow-lg">
             <button type="button" role="menuitem" onClick={() => openDialog("rename")} className={menuItemClass}>
               เปลี่ยนชื่อแชต
             </button>

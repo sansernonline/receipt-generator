@@ -15,6 +15,24 @@
   --color-warn: #b45309;
   --font-sans: "Sarabun", "Noto Sans Thai", system-ui, sans-serif;
   --font-head: "Bai Jamjuree", "Sarabun", system-ui, sans-serif;
+
+  /* การเคลื่อนไหวตาม mockup: pop ของเมนูและกล่องโต้ตอบ · จุดกำลังพิมพ์ */
+  --animate-pop: pop 0.2s ease-out;
+  --animate-pop-fast: pop 0.15s ease-out;
+  --animate-typing: typing 1s ease-in-out infinite;
+
+  @keyframes pop {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes typing {
+    0%, 80%, 100% { opacity: 0.3; }
+    40% { opacity: 1; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
 body {
