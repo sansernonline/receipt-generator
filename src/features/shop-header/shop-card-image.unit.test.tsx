@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { BillPreview } from "@/features/bill/bill-preview";
@@ -7,12 +7,13 @@ import { totalsOf } from "@/features/draft/draft-totals";
 import { emptyDraft } from "@/features/draft/parse-draft";
 import { ShopCard } from "./shop-card";
 import { cashShop } from "./test-kit";
-import type { ShopProposal } from "./types";
+import type { LogoCrop, ShopProposal } from "./types";
 
 const A = "11111111-1111-4111-8111-111111111111";
+const LOGO = { dataUrl: "data:image/png;base64,iVBORw0KGgo=", crop: [10, 20, 300, 120] as LogoCrop }; // made up: the stub's logo, never from a real bill
 let posted: Record<string, unknown>[];
 
-// a fake server: it echoes the shop it is asked to save, like the real one
+// a fake server: it echoes the shop it is asked to save, with the logo when one was sent, like the real one
 beforeEach(() => {
   posted = [];
   vi.stubGlobal(
@@ -20,7 +21,8 @@ beforeEach(() => {
     vi.fn(async (_url: string, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
       posted.push(body);
-      return Response.json({ draft: emptyDraft(), totals: totalsOf(emptyDraft()), shop: { id: A, ...body } }, { status: 201 });
+      const { logo, ...fields } = body;
+      return Response.json({ draft: emptyDraft(), totals: totalsOf(emptyDraft()), shop: { id: A, ...fields, ...(logo ? { logo } : {}) } }, { status: 201 });
     }),
   );
 });
@@ -30,11 +32,11 @@ afterEach(() => {
 });
 
 // the card and the bill side by side, as in the chat
-function Harness({ card, sample }: { card: ShopProposal; sample?: string }) {
+function Harness({ card, sample, logo }: { card: ShopProposal; sample?: string; logo?: typeof LOGO }) {
   const [bill, setBill] = useState<BillData | null>(null);
   return (
     <>
-      <ShopCard card={card} hasFollowUp={false} chatId={A} sample={sample} onUsed={setBill} />
+      <ShopCard card={card} hasFollowUp={false} chatId={A} sample={sample} logo={logo} onUsed={setBill} />
       <BillPreview bill={bill} />
     </>
   );
@@ -45,6 +47,45 @@ const sent = async () => {
   await waitFor(() => expect(posted).toHaveLength(1));
   return posted[0];
 };
+
+test("[TC-HDR-049] with the logo switched off, the card is used without it and the bill shows no logo", async () => {
+  render(<Harness card={cashShop} sample="blob:sample" logo={LOGO} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "ไม่ใช้โลโก้" }));
+  use();
+
+  const body = await sent();
+  expect(body).not.toHaveProperty("logo");
+  expect(body).not.toHaveProperty("logoCrop");
+  await waitFor(() => expect(screen.getByRole("article")).toBeInTheDocument());
+  expect(within(screen.getByRole("article")).queryByRole("img")).toBeNull();
+});
+
+test("[FR-HDR-170] with the logo kept, the card sends it with its crop and the bill shows it", async () => {
+  render(<Harness card={cashShop} sample="blob:sample" logo={LOGO} />);
+
+  use();
+
+  expect(await sent()).toMatchObject({ logo: LOGO.dataUrl, logoCrop: LOGO.crop });
+  expect(await within(await screen.findByRole("article")).findByRole("img", { name: "โลโก้ร้าน" })).toHaveAttribute("src", LOGO.dataUrl);
+});
+
+test("[FR-HDR-170] the logo can be switched back on after it was switched off", async () => {
+  render(<Harness card={cashShop} sample="blob:sample" logo={LOGO} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "ไม่ใช้โลโก้" }));
+  fireEvent.click(screen.getByRole("button", { name: "ใช้โลโก้" }));
+  use();
+
+  expect(await sent()).toHaveProperty("logo", LOGO.dataUrl);
+});
+
+test("[TC-HDR-019] a card with no logo cut shows no logo picture and no ไม่ใช้โลโก้ button", () => {
+  render(<Harness card={cashShop} sample="blob:sample" />);
+
+  expect(screen.queryByRole("img", { name: "โลโก้ที่ตัดจากรูป" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /โลโก้/ })).toBeNull();
+});
 
 test("[FR-HDR-050] a card from a picture shows the sample picture to cut the logo from; a card from text does not", () => {
   const { unmount } = render(<Harness card={cashShop} sample="blob:sample" />);

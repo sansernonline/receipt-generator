@@ -29,12 +29,15 @@ function ShopBlock({ shop }: { shop: ShopHeader | null }) {
     );
   }
   return (
-    <div className="min-w-0">
-      <p className="break-words text-[15px] font-semibold leading-snug">{shop.shopName}</p>
-      {shop.address && <Small>{shop.address}</Small>}
-      {(shop.taxId || shop.template !== "invoice") && <Small>{shop.taxId ? `เลขประจำตัวผู้เสียภาษี ${shop.taxId}` : <Missing>ยังไม่มีเลขประจำตัวผู้เสียภาษี</Missing>}</Small>}
-      {shop.phone && <Small>โทร {shop.phone}</Small>}
-      {shop.email && <Small>อีเมล {shop.email}</Small>}
+    <div className="flex min-w-0 items-start gap-3">
+      {shop.logo && <img src={shop.logo} alt="โลโก้ร้าน" className="max-h-14 max-w-24 shrink-0 object-contain" />}
+      <div className="min-w-0">
+        <p className="break-words text-[15px] font-semibold leading-snug">{shop.shopName}</p>
+        {shop.address && <Small>{shop.address}</Small>}
+        {(shop.taxId || shop.template !== "invoice") && <Small>{shop.taxId ? `เลขประจำตัวผู้เสียภาษี ${shop.taxId}` : <Missing>ยังไม่มีเลขประจำตัวผู้เสียภาษี</Missing>}</Small>}
+        {shop.phone && <Small>โทร {shop.phone}</Small>}
+        {shop.email && <Small>อีเมล {shop.email}</Small>}
+      </div>
     </div>
   );
 }

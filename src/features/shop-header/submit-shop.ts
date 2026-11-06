@@ -1,5 +1,6 @@
 import { parseBill } from "@/features/bill/fetch-bill";
 import type { BillData } from "@/features/bill/types";
+import type { LogoPick } from "./logo-picker";
 import type { ShopFields, ShopProposal } from "./types";
 
 export type FieldMessages = Partial<Record<keyof ShopFields, string>>;
@@ -19,15 +20,15 @@ function readFieldMessages(raw: unknown): FieldMessages {
   return fields;
 }
 
-// what goes to the server: the card's fields and its tax mode; the AI's doubts stay in the browser
-function bodyOf({ uncertain: _doubts, ...fields }: ShopProposal) {
-  return { ...fields, vatMode: fields.vatMode ?? "none" };
+// what goes to the server: the card's fields, its tax mode, and the logo only when it is used; the AI's doubts stay in the browser
+function bodyOf({ uncertain: _doubts, logoCrop: _crop, ...fields }: ShopProposal, logo: LogoPick | null) {
+  return { ...fields, vatMode: fields.vatMode ?? "none", ...(logo ? { logo: logo.dataUrl, logoCrop: logo.crop } : {}) };
 }
 
-/** The user's "ใช้หัวบิลนี้": the server checks the fields again and answers with the bill data that now has the shop. */
-export async function submitShop(chatId: string, shop: ShopProposal): Promise<SubmitResult> {
+/** The user's "ใช้หัวบิลนี้": the server checks the fields again and answers with the bill data that now has the shop. logo = the logo to keep, null = none. */
+export async function submitShop(chatId: string, shop: ShopProposal, logo: LogoPick | null = null): Promise<SubmitResult> {
   try {
-    const res = await fetch(`/api/chats/${chatId}/shop`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(bodyOf(shop)) });
+    const res = await fetch(`/api/chats/${chatId}/shop`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(bodyOf(shop, logo)) });
     const body = await res.json().catch(() => null);
     const bill = res.ok ? parseBill(body) : null;
     if (bill) return { ok: true, bill };

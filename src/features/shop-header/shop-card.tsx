@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { TEMPLATES, type TemplateId } from "@/features/bill/bill-templates";
 import type { BillData } from "@/features/bill/types";
+import { type LogoPick, LogoPicker } from "./logo-picker";
 import { type FieldMessages, submitShop } from "./submit-shop";
 import type { ShopFields, ShopProposal } from "./types";
 import { checkShop, hasErrors, parseAccent } from "./validate-shop";
@@ -14,6 +15,7 @@ type Props = {
   hasFollowUp: boolean;
   chatId: string;
   sample?: string; // the picture the card was read from (an object URL); none = the card came from typed text
+  logo?: LogoPick; // a logo already cut from the picture (the user normally cuts it here)
   onUsed: (bill: BillData) => void;
 };
 type TextKey = "shopName" | "address" | "taxId" | "phone" | "email";
@@ -47,8 +49,10 @@ function Field({ label, error, warning, className = "", children }: FieldProps) 
  * The shop header the AI proposed. Nothing here touches the bill: only "ใช้หัวบิลนี้" sends the fields, and the bill shows them
  * after the server has saved them (FR-HDR-070 · 080).
  */
-export function ShopCard({ card, hasFollowUp, chatId, sample, onUsed }: Props) {
+export function ShopCard({ card, hasFollowUp, chatId, sample, logo: cutLogo, onUsed }: Props) {
   const [shop, setShop] = useState<ShopProposal>(card);
+  const [logo, setLogo] = useState<LogoPick | null>(cutLogo ?? null);
+  const [isLogoUsed, setIsLogoUsed] = useState(true);
   const [pressCount, setPressCount] = useState(0); // errors show from the first press; each press moves focus to the first one
   const [isSaving, setIsSaving] = useState(false);
   const [refused, setRefused] = useState<{ message: string; fields: FieldMessages } | null>(null);
@@ -73,7 +77,7 @@ export function ShopCard({ card, hasFollowUp, chatId, sample, onUsed }: Props) {
     setPressCount((count) => count + 1);
     if (hasErrors(problems)) return;
     setIsSaving(true);
-    const result = await submitShop(chatId, shop);
+    const result = await submitShop(chatId, shop, isLogoUsed ? logo : null);
     setIsSaving(false);
     if (result.ok) onUsed(result.bill);
     else setRefused(result);
@@ -127,8 +131,7 @@ export function ShopCard({ card, hasFollowUp, chatId, sample, onUsed }: Props) {
               สีเน้น {accent}
             </p>
           )}
-          {/* the picture is the user's own file (an object URL), so next/image has nothing to optimise */}
-          {sample && <img src={sample} alt="รูปบิลตัวอย่าง" className="max-h-56 max-w-full rounded-[10px] border border-line sm:col-span-2" />}
+          {sample && <LogoPicker sample={sample} logo={logo} isUsed={isLogoUsed} onPick={(pick) => { setLogo(pick); setIsLogoUsed(true); }} onToggle={() => setIsLogoUsed(!isLogoUsed)} />}
         </div>
         <div className="flex flex-wrap items-center gap-3 border-t border-line px-4 py-3">
           <button type="submit" disabled={isSaving} className="h-10 rounded-full bg-accent-fill px-4 font-semibold text-white disabled:opacity-60">

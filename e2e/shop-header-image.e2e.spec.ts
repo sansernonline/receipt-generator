@@ -31,6 +31,17 @@ async function openCardFromPicture(page: Page): Promise<{ accent: () => string |
 const preview = (page: Page) => page.getByRole("region", { name: "ตัวอย่างบิล" });
 const useButton = (page: Page) => page.getByRole("button", { name: "ใช้หัวบิลนี้" });
 
+async function dragLogo(page: Page) {
+  const picture = page.getByRole("img", { name: "รูปบิลตัวอย่าง" });
+  await expect(picture).toHaveJSProperty("complete", true); // the box is measured only once the picture has its size
+  await picture.scrollIntoViewIfNeeded(); // the mouse works in screen coordinates, so the whole picture must be on screen
+  const box = (await picture.boundingBox())!;
+  await page.mouse.move(box.x + 20, box.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 120, box.y + 70, { steps: 4 });
+  await page.mouse.up();
+}
+
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
 });
@@ -62,6 +73,37 @@ test("[TC-HDR-017] a file the browser cannot decode as a picture is sent, with n
 
   await expect(page.getByRole("region", { name: "การ์ดหัวร้าน" })).toBeVisible();
   expect(accentField).toBe(false);
+});
+
+test("[FR-HDR-050] dragging a box on the picture cuts a logo; it is saved with the shop and shows on the bill, also after a reload", async ({ page }) => {
+  await openCardFromPicture(page);
+
+  await dragLogo(page);
+  await expect(page.getByRole("img", { name: "โลโก้ที่ตัดจากรูป" })).toHaveAttribute("src", /^data:image\/png;base64,/);
+  await useButton(page).click();
+
+  await expect(preview(page).getByRole("img", { name: "โลโก้ร้าน" })).toBeVisible();
+  await page.reload();
+  await page.getByRole("navigation", { name: "รายการแชต" }).getByRole("listitem").first().getByRole("button").click();
+  await expect(preview(page).getByRole("img", { name: "โลโก้ร้าน" })).toBeVisible();
+});
+
+test("[TC-HDR-049] ไม่ใช้โลโก้ then ใช้หัวบิลนี้: the bill has no logo", async ({ page }) => {
+  await openCardFromPicture(page);
+  await dragLogo(page);
+
+  await page.getByRole("button", { name: "ไม่ใช้โลโก้" }).click();
+  await useButton(page).click();
+
+  await expect(preview(page).getByRole("article", { name: "ใบเสร็จรับเงิน" }).getByText("ร้านกาแฟบ้านสวน")).toBeVisible();
+  await expect(preview(page).getByRole("img", { name: "โลโก้ร้าน" })).toHaveCount(0);
+});
+
+test("[TC-HDR-019] a picture with no box dragged: no logo picture and no ไม่ใช้โลโก้ button on the card", async ({ page }) => {
+  await openCardFromPicture(page);
+
+  await expect(page.getByRole("img", { name: "โลโก้ที่ตัดจากรูป" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "ไม่ใช้โลโก้" })).toHaveCount(0);
 });
 
 test("[FR-TOT-040] the tax mode from the picture is chosen on the card and is the draft's tax mode once the card is used", async ({ page }) => {

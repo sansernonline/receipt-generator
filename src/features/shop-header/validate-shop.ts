@@ -1,5 +1,5 @@
 import { TEMPLATES } from "@/features/bill/bill-templates";
-import type { ShopFields, ShopHeader } from "./types";
+import type { LogoCrop, ShopFields, ShopHeader } from "./types";
 
 export type ShopProblems = { errors: Partial<Record<keyof ShopFields, string>>; warnings: Partial<Record<keyof ShopFields, string>> };
 
@@ -29,6 +29,10 @@ export const parseAccent = (raw: unknown): string | undefined => (typeof raw ===
 
 export const hasErrors = ({ errors }: ShopProblems) => Object.keys(errors).length > 0;
 
+const MAX_CROP_VALUE = 100_000; // pixels; a self-set ceiling
+const isCropValue = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= MAX_CROP_VALUE;
+const parseCrop = (raw: unknown): LogoCrop | undefined => (Array.isArray(raw) && raw.length === 4 && raw.every(isCropValue) ? (raw as LogoCrop) : undefined);
+
 /** The confirm request body (outside data): every field present with the right type, anything else dropped. null = not a shop. */
 export function parseShopFields(raw: unknown): ShopFields | null {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
@@ -37,14 +41,17 @@ export function parseShopFields(raw: unknown): ShopFields | null {
   const template = TEMPLATES.find(({ id }) => id === read("template"))?.id;
   if (texts.some((value) => typeof value !== "string") || !template) return null;
   const [shopName, address, taxId, phone, email] = (texts as string[]).map((value) => value.trim());
-  const accent = parseAccent(read("accent"));
-  return { shopName, address, taxId, phone, email, template, ...(accent ? { accent } : {}) };
+  const [accent, logoCrop] = [parseAccent(read("accent")), parseCrop(read("logoCrop"))];
+  return { shopName, address, taxId, phone, email, template, ...(accent ? { accent } : {}), ...(logoCrop ? { logoCrop } : {}) };
 }
 
-/** A stored or received shop header (shop.json, the server's answer): the fields as above plus its id. */
+export const LOGO_PREFIX = "data:image/png;base64,";
+
+/** A stored or received shop header (shop.json, the server's answer): the fields as above plus its id, and the logo as a data URL when it has one. */
 export function parseShopHeader(raw: unknown): ShopHeader | null {
   const fields = parseShopFields(raw);
   if (!fields) return null;
-  const id = Object.hasOwn(raw as object, "id") ? (raw as { id: unknown }).id : null;
-  return typeof id === "string" ? { id, ...fields } : null;
+  const [id, logo] = ["id", "logo"].map((key) => (Object.hasOwn(raw as object, key) ? (raw as Record<string, unknown>)[key] : undefined));
+  const hasLogo = typeof logo === "string" && logo.startsWith(LOGO_PREFIX) && /^[A-Za-z0-9+/]+={0,2}$/.test(logo.slice(LOGO_PREFIX.length));
+  return typeof id === "string" ? { id, ...fields, ...(hasLogo ? { logo } : {}) } : null;
 }

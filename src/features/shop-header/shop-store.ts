@@ -5,7 +5,7 @@ import type { Store } from "@/features/storage/store";
 import { isValidId } from "@/features/storage/ids";
 import { parseDraft } from "@/features/draft/parse-draft";
 import type { VatMode } from "@/features/totals/types";
-import { parseShopFields } from "./validate-shop";
+import { LOGO_PREFIX, parseShopFields } from "./validate-shop";
 import type { ShopFields, ShopHeader } from "./types";
 
 // the whole chat.json is read and written back, so fields this file does not know (messages) stay
@@ -16,6 +16,7 @@ export class ShopLockedError extends Error {}
 
 const chatFile = (store: Store, chatId: string) => path.join(store.chatDir(chatId), "chat.json");
 const shopFile = (store: Store, shopId: string) => path.join(store.shopDir(shopId), "shop.json");
+const logoFile = (store: Store, shopId: string) => path.join(store.shopDir(shopId), "logo.png");
 const draftFile = (store: Store, chatId: string) => path.join(store.chatDir(chatId), "draft.json");
 
 // A shop id whose file is missing or damaged counts as no shop, so the user can set it again instead of being locked out.
@@ -30,10 +31,16 @@ async function loadShop(store: Store, shopId: unknown): Promise<ShopHeader | nul
   return fields && { id: shopId, ...fields };
 }
 
-/** The confirmed shop header of the chat, or null when there is none (or its file is missing or damaged). */
+/** The confirmed shop header of the chat, or null when there is none (or its file is missing or damaged). The logo is read too, as a data URL. */
 export async function readShop(store: Store, chatId: string): Promise<ShopHeader | null> {
   const { shopId } = await store.readJson<StoredChat>(chatFile(store, chatId));
-  return loadShop(store, shopId);
+  const shop = await loadShop(store, shopId);
+  if (!shop) return null;
+  const png = await fsp.readFile(logoFile(store, shop.id)).catch((error) => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  });
+  return png ? { ...shop, logo: `${LOGO_PREFIX}${png.toString("base64")}` } : shop;
 }
 
 // the draft starts with the tax mode of the sample bill (FR-TOT-040); only the draft keeps it, shop.json does not
@@ -44,10 +51,10 @@ async function startDraftVat(store: Store, chatId: string, mode: VatMode | undef
   await store.writeJsonAtomic(draftFile(store, chatId), { ...draft, footer: { ...draft.footer, vat: { ...draft.footer.vat, mode } } });
 }
 
-export type ShopExtras = { vatMode?: VatMode };
+export type ShopExtras = { vatMode?: VatMode; logo?: Buffer };
 
-/** Called only by the user's "ใช้หัวบิลนี้" button, with fields the route has already checked (ADR-0006). */
-export function confirmShop(store: Store, chatId: string, fields: ShopFields, { vatMode }: ShopExtras = {}): Promise<ShopHeader> {
+/** Called only by the user's "ใช้หัวบิลนี้" button, with fields the route has already checked (ADR-0006). No logo given = no logo.png is made (FR-HDR-170). */
+export function confirmShop(store: Store, chatId: string, fields: ShopFields, { vatMode, logo }: ShopExtras = {}): Promise<ShopHeader> {
   return store.withChatLock(chatId, async () => {
     const chat = await store.readJson<StoredChat>(chatFile(store, chatId));
     if (await loadShop(store, chat.shopId)) throw new ShopLockedError();
@@ -56,12 +63,13 @@ export function confirmShop(store: Store, chatId: string, fields: ShopFields, { 
     const updated = { ...chat, shopId: shop.id };
     try {
       await store.writeJsonAtomic(shopFile(store, shop.id), shop);
+      if (logo) await fsp.writeFile(logoFile(store, shop.id), logo);
       await store.writeJsonAtomic(chatFile(store, chatId), updated);
     } catch (error) {
       await fsp.rm(store.shopDir(shop.id), { recursive: true, force: true }).catch(() => undefined); // best effort: no orphan file
       throw error;
     }
     await store.upsertIndex(updated);
-    return shop;
+    return logo ? { ...shop, logo: `${LOGO_PREFIX}${logo.toString("base64")}` } : shop;
   });
 }
