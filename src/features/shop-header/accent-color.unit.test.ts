@@ -47,6 +47,14 @@ describe("dominantColor", () => {
     expect(dominantColor(picture(8, 8, 3, [0, 0, 0], WHITE))).toBeNull();
   });
 
+  it("a bright yellow is left out: its contrast with white paper is about 1.3 to 1", () => {
+    expect(dominantColor(picture(8, 8, 8, [0xff, 0xe6, 0x00], [0xff, 0xe6, 0x00]))).toBeNull();
+  });
+
+  it("a normal brand red still passes", () => {
+    expect(dominantColor(picture(8, 8, 8, [0xc0, 0x1c, 0x28], WHITE))).toBe("#c01c28");
+  });
+
   it("a very pale colour is left out: it would not read on white paper", () => {
     expect(dominantColor(picture(8, 8, 8, [255, 250, 205], [255, 250, 205]))).toBeNull();
   });

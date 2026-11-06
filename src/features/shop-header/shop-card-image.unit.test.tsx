@@ -106,6 +106,26 @@ test("[FR-HDR-040] the accent from the picture is shown and sent with the card",
   expect(await sent()).toMatchObject({ accent: "#1f4e9c" });
 });
 
+test("[TC-HDR-016] ใช้สีแม่แบบ drops the colour from the picture: no accent is sent, and it can be taken back", async () => {
+  render(<Harness card={{ ...cashShop, accent: "#1f4e9c" }} sample="blob:sample" />);
+
+  fireEvent.click(screen.getByRole("button", { name: "ใช้สีแม่แบบ" }));
+  expect(screen.getByRole("button", { name: "ใช้สีจากรูป" })).toBeInTheDocument();
+  use();
+
+  expect(await sent()).not.toHaveProperty("accent");
+});
+
+test("[TC-HDR-016] the colour from the picture is sent again after ใช้สีจากรูป", async () => {
+  render(<Harness card={{ ...cashShop, accent: "#1f4e9c" }} sample="blob:sample" />);
+
+  fireEvent.click(screen.getByRole("button", { name: "ใช้สีแม่แบบ" }));
+  fireEvent.click(screen.getByRole("button", { name: "ใช้สีจากรูป" }));
+  use();
+
+  expect(await sent()).toMatchObject({ accent: "#1f4e9c" });
+});
+
 test("[FR-HDR-040] no accent found: nothing is shown and nothing is sent", async () => {
   render(<Harness card={cashShop} sample="blob:sample" />);
 

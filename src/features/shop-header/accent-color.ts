@@ -1,8 +1,12 @@
 import { decodePixels } from "./decode-pixels";
 
 const MIN_CHROMA = 40; // below this a pixel is white, grey or black: paper and text, not a brand colour
-const MAX_BRIGHTNESS = 200; // a paler colour would not read as a title on white paper
+const MIN_CONTRAST = 4.5; // against white paper (WCAG AA for text): a paler colour would not read as the title or the total
 const MIN_ALPHA = 128;
+
+const linear = (channel: number) => (channel / 255 <= 0.03928 ? channel / 255 / 12.92 : ((channel / 255 + 0.055) / 1.055) ** 2.4);
+// WCAG contrast of a colour against white: 1.05 / (relative luminance + 0.05)
+const contrastWithWhite = (r: number, g: number, b: number) => 1.05 / (0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b) + 0.05);
 
 const hex = (n: number) => Math.round(n).toString(16).padStart(2, "0");
 
@@ -11,7 +15,7 @@ export function dominantColor(rgba: ArrayLike<number>): string | null {
   const buckets = new Map<number, { count: number; r: number; g: number; b: number }>(); // 16 levels per channel
   for (let i = 0; i + 3 < rgba.length; i += 4) {
     const [r, g, b] = [rgba[i], rgba[i + 1], rgba[i + 2]];
-    const isColoured = Math.max(r, g, b) - Math.min(r, g, b) >= MIN_CHROMA && (r + g + b) / 3 <= MAX_BRIGHTNESS;
+    const isColoured = Math.max(r, g, b) - Math.min(r, g, b) >= MIN_CHROMA && contrastWithWhite(r, g, b) >= MIN_CONTRAST;
     if (rgba[i + 3] < MIN_ALPHA || !isColoured) continue;
     const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
     const bucket = buckets.get(key) ?? { count: 0, r: 0, g: 0, b: 0 };

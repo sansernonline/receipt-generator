@@ -53,6 +53,7 @@ export function ShopCard({ card, hasFollowUp, chatId, sample, logo: cutLogo, onU
   const [shop, setShop] = useState<ShopProposal>(card);
   const [logo, setLogo] = useState<LogoPick | null>(cutLogo ?? null);
   const [isLogoUsed, setIsLogoUsed] = useState(true);
+  const [isAccentUsed, setIsAccentUsed] = useState(true); // off = the template keeps its own colour
   const [pressCount, setPressCount] = useState(0); // errors show from the first press; each press moves focus to the first one
   const [isSaving, setIsSaving] = useState(false);
   const [refused, setRefused] = useState<{ message: string; fields: FieldMessages } | null>(null);
@@ -77,7 +78,7 @@ export function ShopCard({ card, hasFollowUp, chatId, sample, logo: cutLogo, onU
     setPressCount((count) => count + 1);
     if (hasErrors(problems)) return;
     setIsSaving(true);
-    const result = await submitShop(chatId, shop, isLogoUsed ? logo : null);
+    const result = await submitShop(chatId, isAccentUsed ? shop : { ...shop, accent: undefined }, isLogoUsed ? logo : null);
     setIsSaving(false);
     if (result.ok) onUsed(result.bill);
     else setRefused(result);
@@ -128,7 +129,10 @@ export function ShopCard({ card, hasFollowUp, chatId, sample, logo: cutLogo, onU
           {accent && (
             <p className="flex items-center gap-2 text-xs text-ink-2 sm:col-span-2">
               <span aria-hidden="true" style={{ background: accent }} className="size-5 rounded-full border border-line-2" />
-              สีเน้น {accent}
+              <span className={isAccentUsed ? "" : "line-through"}>สีเน้น {accent}</span>
+              <button type="button" onClick={() => setIsAccentUsed(!isAccentUsed)} className="h-8 rounded-full border border-line-2 px-3 hover:bg-surface-2">
+                {isAccentUsed ? "ใช้สีแม่แบบ" : "ใช้สีจากรูป"}
+              </button>
             </p>
           )}
           {sample && <LogoPicker sample={sample} logo={logo} isUsed={isLogoUsed} onPick={(pick) => { setLogo(pick); setIsLogoUsed(true); }} onToggle={() => setIsLogoUsed(!isLogoUsed)} />}
